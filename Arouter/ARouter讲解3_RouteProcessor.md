@@ -23,13 +23,13 @@ public @interface Route {
 
 通过 Route 的注解，框架会把我们注解的Activity 、Fragment、Service、ContentProvider以及IProvider收集起来
 
-![image-20210512234509772](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210512234509772.png)
+![image-20210512234509772](image-20210512234509772.png)
 
 
 
 按照不同的Group会生成类似这样的代码，这样框架在初始化的时候，就可以根据这些类把路由信息收集起来。
 
-![image-20210512234700592](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210512234700592.png)
+![image-20210512234700592](image-20210512234700592.png)
 
 
 
@@ -371,7 +371,7 @@ JavaFile.builder(PACKAGE_OF_GENERATE_FILE,  // com.alibaba.android.arouter.route
 
 上面的会生成类似这样的类
 
-![图ARouter$$Group$$groupName](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210512230841403.png)
+![图ARouter$$Group$$groupName](image-20210512230841403.png)
 
 
 
@@ -390,7 +390,7 @@ JavaFile.builder(PACKAGE_OF_GENERATE_FILE,  // com.alibaba.android.arouter.route
 
 上面的会生成类似这样的类
 
-![ARouter$$Providers$$moduleName](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210512231418206.png)
+![ARouter$$Providers$$moduleName](image-20210512231418206.png)
 
 
 
@@ -411,7 +411,7 @@ JavaFile.builder(PACKAGE_OF_GENERATE_FILE,  //com.alibaba.android.arouter.routes
 
 上面的会生成类似这样的类
 
-![ARouter$$Root$$moduleName](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210512231641905.png)
+![ARouter$$Root$$moduleName](image-20210512231641905.png)
 
 
 

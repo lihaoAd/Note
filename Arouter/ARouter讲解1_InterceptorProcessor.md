@@ -48,7 +48,7 @@ public class ARouter$$Interceptors$$modulejava implements IInterceptorGroup {
 
 这是google的auto-service-annotation，主要就是帮助我们生成` META-INF/services/javax.annotation.processing.Processor`文件，要不然这东西就要自己手动写了。
 
-<img src="C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210510231418242.png" alt="image-20210510231418242" style="zoom: 67%;" />
+<img src="image-20210510231418242.png" alt="image-20210510231418242" style="zoom: 67%;" />
 
 ```java
 @SupportedAnnotationTypes(ANNOTATION_TYPE_INTECEPTOR)
@@ -219,7 +219,7 @@ private void parseInterceptors(Set<? extends Element> elements) throws IOExcepti
 }
 ```
 
-<img src="C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210511002311714.png" alt="image-20210511002311714" style="zoom:67%;" />
+<img src="image-20210511002311714.png" alt="image-20210511002311714" style="zoom:67%;" />
 
 
 

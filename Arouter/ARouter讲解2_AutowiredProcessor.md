@@ -25,7 +25,7 @@ public @interface Autowired {
 
 Autowired的对用是对字段进行注入，要不然就要用 getIntent().getIntExtra()之类的方法。这也会生成一个新的类，注入的操作也就在这个类中操作。就如同类似下面的类
 
-![image-20210511230216155](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210511230216155.png)
+![image-20210511230216155](image-20210511230216155.png)
 
 
 
@@ -81,7 +81,7 @@ private void categories(Set<? extends Element> elements) throws IllegalAccessExc
 
 ```
 
-![image-20210511215138090](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210511215138090.png)
+![image-20210511215138090](image-20210511215138090.png)
 
 
 
@@ -251,5 +251,5 @@ private void generateHelper() throws IOException, IllegalAccessException {
 
 最后生成的类就类似下面这样
 
-![image-20210511223609007](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210511223609007.png)
+![image-20210511223609007](image-20210511223609007.png)
 

@@ -6,27 +6,27 @@
 
 - 被Route注解的会生成类似下面这样的类
 
-![image-20210513215345870](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210513215345870.png)
+![image-20210513215345870](image-20210513215345870.png)
 
 如果是IProvider类型的，会生成类似下面的类
 
-![image-20210513215611787](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210513215611787.png)
+![image-20210513215611787](image-20210513215611787.png)
 
 - 如果是 IInterceptor 类型的，会生成类似下面的类，其实 IInterceptor 也是 IProvider类的子类
 
-![image-20210513215732293](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210513215732293.png)
+![image-20210513215732293](image-20210513215732293.png)
 
 
 
 - 可以用Class 来进行路由，是因为生成了类似下面这样的类，path就是类的全限定名。
 
-  ![image-20210513215959795](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210513215959795.png)
+  ![image-20210513215959795](image-20210513215959795.png)
 
 
 
 - 收集每个组的类。
 
-![image-20210513220113496](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210513220113496.png)
+![image-20210513220113496](image-20210513220113496.png)
 
 ## ARouter.init
 
@@ -694,11 +694,11 @@ Test3Activity$ $ARouter$$Autowired 这个类，实例化这个对象，调用这
 
 
 
-![image-20210513234722439](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210513234722439.png)
+![image-20210513234722439](image-20210513234722439.png)
 
 
 
-![image-20210513234800196](C:\Users\LIHAO\Desktop\Slash\Arouter\image-20210513234800196.png)
+![image-20210513234800196](Arouter\image-20210513234800196.png)
 
 
 
