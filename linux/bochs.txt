@@ -1,0 +1,8 @@
+安装
+cd bochs
+sudo apt install libx11-dev
+./configure --enable-debugger --enable-disasm --enable-readline LIBS='-lX11'
+make
+sudo make install
+
+
