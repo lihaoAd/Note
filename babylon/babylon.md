@@ -10,7 +10,7 @@
 
 可以旋转，并且始终朝着目标点
 
-![arc rotate camera](img\camalphabeta.jpg)
+![arc rotate camera](img/camalphabeta.jpg)
 
 
 
@@ -77,7 +77,7 @@ camera.attachControl(canvas, true);
 	var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {}, scene);
 ```
 
-<img src="img\image-20210301095023508.png" alt="image-20210301095023508" style="zoom:33%;" />
+<img src="img/image-20210301095023508.png" alt="image-20210301095023508" style="zoom:33%;" />
 
 ### Spot Light
 
@@ -96,7 +96,7 @@ camera.attachControl(canvas, true);
 	var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {}, scene);	
 ````
 
-<img src="img\image-20210301100253902.png" alt="image-20210301100253902" style="zoom:33%;" />
+<img src="img/image-20210301100253902.png" alt="image-20210301100253902" style="zoom:33%;" />
 
 ### Hemispheric Light
 
@@ -147,7 +147,7 @@ CreateBox(name: string, options: { backUVs?: Vector4; bottomBaseAt?: number; dep
     const box = BABYLON.MeshBuilder.CreateBox("box", {});
 ```
 
-<img src="img\image-20210301101140624.png" alt="image-20210301101140624" style="zoom:33%;" />
+<img src="img/image-20210301101140624.png" alt="image-20210301101140624" style="zoom:33%;" />
 
 ```javascript
     const box = BABYLON.MeshBuilder.CreateBox("box", {faceColors:
@@ -159,7 +159,7 @@ CreateBox(name: string, options: { backUVs?: Vector4; bottomBaseAt?: number; dep
     new BABYLON.Color4(1,1,1)]}); // 顺序为后前右左上下
 ```
 
-<img src="img\image-20210301102255733.png" alt="image-20210301102255733" style="zoom:33%;" />
+<img src="img/image-20210301102255733.png" alt="image-20210301102255733" style="zoom:33%;" />
 
 
 
@@ -190,15 +190,15 @@ CreateBox(name: string, options: { backUVs?: Vector4; bottomBaseAt?: number; dep
     box.material = mat;
 ```
 
-<img src="img\image-20210301102837431.png" alt="image-20210301102837431" style="zoom:33%;" />
+<img src="img/image-20210301102837431.png" alt="image-20210301102837431" style="zoom:33%;" />
 
-<img src="img\image-20210301102905411.png" alt="image-20210301102905411" style="zoom:33%;" />
+<img src="img/image-20210301102905411.png" alt="image-20210301102905411" style="zoom:33%;" />
 
 
 
 注意UV坐标，原点在左下角，使用（0，0）和（1，1）将使用整个纹理图集
 
-<img src="img\image-20210301105635996.png" alt="image-20210301105635996" style="zoom:50%;" />
+<img src="img/image-20210301105635996.png" alt="image-20210301105635996" style="zoom:50%;" />
 
 
 
@@ -227,7 +227,7 @@ CreateCylinder(name: string, options: { arc?: number; backUVs?: Vector4; cap?: n
     const cylinder = BABYLON.MeshBuilder.CreateCylinder("cylinder", {});
 ```
 
-<img src="img\image-20210301131006431.png" alt="image-20210301131006431" style="zoom:50%;" />
+<img src="img/image-20210301131006431.png" alt="image-20210301131006431" style="zoom:50%;" />
 
 
 
@@ -241,7 +241,7 @@ CreateCylinder(name: string, options: { arc?: number; backUVs?: Vector4; cap?: n
     const cylinder = BABYLON.MeshBuilder.CreateCylinder("cylinder", {diameterTop: 0});
 ```
 
-<img src="img\image-20210301131150014.png" alt="image-20210301131150014" style="zoom: 50%;" />
+<img src="img/image-20210301131150014.png" alt="image-20210301131150014" style="zoom: 50%;" />
 
 
 
@@ -251,7 +251,7 @@ CreateCylinder(name: string, options: { arc?: number; backUVs?: Vector4; cap?: n
         tessellation:10});
 ```
 
-<img src="img\image-20210301131518908.png" alt="image-20210301131518908" style="zoom:50%;" />
+<img src="img/image-20210301131518908.png" alt="image-20210301131518908" style="zoom:50%;" />
 
 `````javascript
     const cylinder = BABYLON.MeshBuilder.CreateCylinder("cylinder", {
@@ -259,7 +259,7 @@ CreateCylinder(name: string, options: { arc?: number; backUVs?: Vector4; cap?: n
         tessellation:100});
 `````
 
-<img src="img\image-20210301131559009.png" alt="image-20210301131559009" style="zoom:50%;" />
+<img src="img/image-20210301131559009.png" alt="image-20210301131559009" style="zoom:50%;" />
 
 
 
@@ -273,7 +273,7 @@ CreateCylinder(name: string, options: { arc?: number; backUVs?: Vector4; cap?: n
     cylinder.material =mat		
 ````
 
-<img src="img\image-20210301132618936.png" alt="image-20210301132618936" style="zoom:50%;" />
+<img src="img/image-20210301132618936.png" alt="image-20210301132618936" style="zoom:50%;" />
 
 ```javascript
    const faceColors = new Array()
@@ -284,7 +284,7 @@ CreateCylinder(name: string, options: { arc?: number; backUVs?: Vector4; cap?: n
    const cylinder = BABYLON.MeshBuilder.CreateCylinder("cylinder", {faceColors:faceColors});
 ```
 
-<img src="img\image-20210301133454571.png" alt="image-20210301133454571" style="zoom:50%;" />
+<img src="img/image-20210301133454571.png" alt="image-20210301133454571" style="zoom:50%;" />
 
 
 
@@ -301,15 +301,15 @@ CreateCylinder(name: string, options: { arc?: number; backUVs?: Vector4; cap?: n
 	can.material = canMaterial;
 ```
 
-<img src="img\image-20210301133811836.png" alt="image-20210301133811836" style="zoom: 50%;" />
+<img src="img/image-20210301133811836.png" alt="image-20210301133811836" style="zoom: 50%;" />
 
-<img src="img\image-20210301133840525.png" alt="image-20210301133840525" style="zoom:33%;" />
+<img src="img/image-20210301133840525.png" alt="image-20210301133840525" style="zoom:33%;" />
 
 ```javascript
 const cylinder = BABYLON.MeshBuilder.CreateCylinder("cylinder", {arc: 0.6, sideOrientation: BABYLON.Mesh.DOUBLESIDE});
 ```
 
-<img src="img\image-20210301134020341.png" alt="image-20210301134020341" style="zoom:50%;" />
+<img src="img/image-20210301134020341.png" alt="image-20210301134020341" style="zoom:50%;" />
 
 
 
@@ -340,7 +340,7 @@ const capsule = BABYLON.MeshBuilder.CreateCapsule("ribbon", options, scene);
     const capsule = new BABYLON.MeshBuilder.CreateCapsule("capsule", {}, scene)
 ```
 
-![image-20210301161322317](img\image-20210301161322317.png)
+![image-20210301161322317](img/image-20210301161322317.png)
 
 - subdivisions
 
@@ -356,7 +356,7 @@ const capsule = BABYLON.MeshBuilder.CreateCapsule("ribbon", options, scene);
     capsule.material =mat	
 ````
 
-![image-20210301163049699](img\image-20210301163049699.png)
+![image-20210301163049699](img/image-20210301163049699.png)
 
 
 
@@ -375,7 +375,7 @@ const capsule = BABYLON.MeshBuilder.CreateCapsule("ribbon", options, scene);
       capsule.material =mat	
   ```
 
-  ![image-20210301163506155](img\image-20210301163506155.png)
+  ![image-20210301163506155](img/image-20210301163506155.png)
 
 - radius
 
@@ -393,7 +393,7 @@ const capsule = BABYLON.MeshBuilder.CreateCapsule("ribbon", options, scene);
       capsule.material =mat
   ```
 
-  ![image-20210301163731382](img\image-20210301163731382.png)
+  ![image-20210301163731382](img/image-20210301163731382.png)
 
 - capSubdivisions、topCapSubdivisions、bottomCapSubdivisions
 
@@ -410,7 +410,7 @@ const capsule = BABYLON.MeshBuilder.CreateCapsule("ribbon", options, scene);
     capsule.material =mat
 ```
 
-![image-20210301163852704](img\image-20210301163852704.png)
+![image-20210301163852704](img/image-20210301163852704.png)
 
 
 
@@ -427,7 +427,7 @@ const capsule = BABYLON.MeshBuilder.CreateCapsule("ribbon", options, scene);
     capsule.material =mat
 ```
 
-![image-20210301164151757](img\image-20210301164151757.png)
+![image-20210301164151757](img/image-20210301164151757.png)
 
 
 
@@ -446,7 +446,7 @@ const capsule = BABYLON.MeshBuilder.CreateCapsule("ribbon", options, scene);
     capsule.material =mat
 ````
 
-![image-20210301164009428](img\image-20210301164009428.png)
+![image-20210301164009428](img/image-20210301164009428.png)
 
 ### Plane
 
@@ -478,7 +478,7 @@ const plane = BABYLON.MeshBuilder.CreatePlane("plane", options, scene);
     plane.material = mat;
 ````
 
-<img src="img\image-20210301164943895.png" alt="image-20210301164943895" style="zoom:33%;" />
+<img src="img/image-20210301164943895.png" alt="image-20210301164943895" style="zoom:33%;" />
 
 
 
@@ -542,7 +542,7 @@ const tiledPlane = BABYLON.MeshBuilder.CreateTiledPlane("plane", options, scene)
 	tiledPane.material = mat;
 ```
 
-<img src="img\image-20210301174740160.png" alt="image-20210301174740160" style="zoom: 50%;" />
+<img src="img/image-20210301174740160.png" alt="image-20210301174740160" style="zoom: 50%;" />
 
 `````javascript
 	const options = {
@@ -553,7 +553,7 @@ const tiledPlane = BABYLON.MeshBuilder.CreateTiledPlane("plane", options, scene)
 	}
 `````
 
-<img src="img\image-20210301175038652.png" alt="image-20210301175038652" style="zoom:50%;" />
+<img src="img/image-20210301175038652.png" alt="image-20210301175038652" style="zoom:50%;" />
 
 
 
@@ -570,7 +570,7 @@ const tiledPlane = BABYLON.MeshBuilder.CreateTiledPlane("plane", options, scene)
 	}
 ````
 
-<img src="img\image-20210301180537744.png" alt="image-20210301180537744" style="zoom:50%;" />
+<img src="img/image-20210301180537744.png" alt="image-20210301180537744" style="zoom:50%;" />
 
 
 
@@ -585,7 +585,7 @@ const tiledPlane = BABYLON.MeshBuilder.CreateTiledPlane("plane", options, scene)
 	}
 ```
 
-<img src="img\image-20210301180726788.png" alt="image-20210301180726788" style="zoom:50%;" />
+<img src="img/image-20210301180726788.png" alt="image-20210301180726788" style="zoom:50%;" />
 
 
 
@@ -600,7 +600,7 @@ const tiledPlane = BABYLON.MeshBuilder.CreateTiledPlane("plane", options, scene)
 	}
 ```
 
-<img src="img\image-20210301180853463.png" alt="image-20210301180853463" style="zoom:50%;" />
+<img src="img/image-20210301180853463.png" alt="image-20210301180853463" style="zoom:50%;" />
 
 
 
@@ -617,19 +617,19 @@ const tiledPlane = BABYLON.MeshBuilder.CreateTiledPlane("plane", options, scene)
 
 
 
-<img src="img\image-20210301181054932.png" alt="image-20210301181054932" style="zoom:50%;" />
+<img src="img/image-20210301181054932.png" alt="image-20210301181054932" style="zoom:50%;" />
 
 ```javascript
 const pat = BABYLON.Mesh.FLIP_N_ROTATE_TILE; //既有翻转又有旋转
 ```
 
-<img src="img\image-20210301181333428.png" alt="image-20210301181333428" style="zoom:50%;" />
+<img src="img/image-20210301181333428.png" alt="image-20210301181333428" style="zoom:50%;" />
 
 ```javascript
 const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
 ```
 
-<img src="img\image-20210301181437369.png" alt="image-20210301181437369" style="zoom:50%;" />
+<img src="img/image-20210301181437369.png" alt="image-20210301181437369" style="zoom:50%;" />
 
 
 
@@ -650,7 +650,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
 	}
 ```
 
-<img src="img\image-20210301182115896.png" alt="image-20210301182115896" style="zoom:50%;" />
+<img src="img/image-20210301182115896.png" alt="image-20210301182115896" style="zoom:50%;" />
 
 
 
@@ -667,7 +667,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
 	}
 ```
 
-<img src="img\image-20210301182213411.png" alt="image-20210301182213411" style="zoom:50%;" />
+<img src="img/image-20210301182213411.png" alt="image-20210301182213411" style="zoom:50%;" />
 
 ```javascript
 	const options = {
@@ -681,7 +681,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
 	}
 ```
 
-<img src="img\image-20210301182349077.png" alt="image-20210301182349077" style="zoom:50%;" />
+<img src="img/image-20210301182349077.png" alt="image-20210301182349077" style="zoom:50%;" />
 
 
 
@@ -713,7 +713,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
 	tiledBox.material = mat;
 ```
 
-![image-20210301182725325](img\image-20210301182725325.png)
+![image-20210301182725325](img/image-20210301182725325.png)
 
 
 
@@ -747,7 +747,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
     sphere.material = mat
 ```
 
-<img src="img\image-20210301184119318.png" alt="image-20210301184119318" style="zoom:33%;" />
+<img src="img/image-20210301184119318.png" alt="image-20210301184119318" style="zoom:33%;" />
 
 
 
@@ -764,7 +764,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
     sphere.material = mat
 ```
 
-<img src="img\image-20210301184253929.png" alt="image-20210301184253929" style="zoom:33%;" />
+<img src="img/image-20210301184253929.png" alt="image-20210301184253929" style="zoom:33%;" />
 
 
 
@@ -778,7 +778,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
     });
 `````
 
-<img src="img\image-20210301184448210.png" alt="image-20210301184448210" style="zoom:33%;" />
+<img src="img/image-20210301184448210.png" alt="image-20210301184448210" style="zoom:33%;" />
 
 
 
@@ -791,7 +791,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
     });
 ````
 
-<img src="img\image-20210301184539163.png" alt="image-20210301184539163" style="zoom: 50%;" />
+<img src="img/image-20210301184539163.png" alt="image-20210301184539163" style="zoom: 50%;" />
 
 
 
@@ -809,7 +809,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
     {height: 3, width: 3});
 ```
 
-<img src="img\image-20210301185044863.png" alt="image-20210301185044863" style="zoom:50%;" />
+<img src="img/image-20210301185044863.png" alt="image-20210301185044863" style="zoom:50%;" />
 
 
 
@@ -822,7 +822,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
     ground.material = mat;
 ````
 
-<img src="img\image-20210301185140162.png" alt="image-20210301185140162" style="zoom:50%;" />
+<img src="img/image-20210301185140162.png" alt="image-20210301185140162" style="zoom:50%;" />
 
 
 
@@ -886,7 +886,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
 	sphere2.position.x = 1.5;
 ```
 
-<img src="img\image-20210301195446818.png" alt="image-20210301195446818" style="zoom:50%;" />
+<img src="img/image-20210301195446818.png" alt="image-20210301195446818" style="zoom:50%;" />
 
 
 
@@ -916,7 +916,7 @@ const pat = BABYLON.Mesh.FLIP_N_ROTATE_ROW;
     particleSystem.start();
 ````
 
-<img src="img\image-20210301200338962.png" alt="image-20210301200338962" style="zoom: 50%;" />
+<img src="img/image-20210301200338962.png" alt="image-20210301200338962" style="zoom: 50%;" />
 
 
 
@@ -940,7 +940,7 @@ BABYLON.ParticleHelper.CreateDefault(new BABYLON.Vector3(0, 0.5, 0)).start();
     particleSystem.start();
 ```
 
-![image-20210301201134601](img\image-20210301201134601.png)
+![image-20210301201134601](img/image-20210301201134601.png)
 
 
 
@@ -964,7 +964,7 @@ var pointEmitter = particleSystem.createPointEmitter(new BABYLON.Vector3(-7, 8, 
 
 ```
 
-<img src="img\image-20210301204342257.png" alt="image-20210301204342257" style="zoom:50%;" />
+<img src="img/image-20210301204342257.png" alt="image-20210301204342257" style="zoom:50%;" />
 
 #### Box Emitter
 
@@ -979,7 +979,7 @@ var pointEmitter = particleSystem.createPointEmitter(new BABYLON.Vector3(-7, 8, 
 var boxEmitter = particleSystem.createBoxEmitter(new BABYLON.Vector3(-7, 8, 3), new BABYLON.Vector3(7, 8, -3), new BABYLON.Vector3(-1, 0, 0), new BABYLON.Vector3(1, 0, 0));
 ```
 
-<img src="img\image-20210301204412650.png" alt="image-20210301204412650" style="zoom:50%;" />
+<img src="img/image-20210301204412650.png" alt="image-20210301204412650" style="zoom:50%;" />
 
 #### Sphere Emitter
 
@@ -987,7 +987,7 @@ var boxEmitter = particleSystem.createBoxEmitter(new BABYLON.Vector3(-7, 8, 3), 
 var sphereEmitter = particleSystem.createSphereEmitter(1.2);
 ```
 
-<img src="img\image-20210301204751180.png" alt="image-20210301204751180" style="zoom: 67%;" />
+<img src="img/image-20210301204751180.png" alt="image-20210301204751180" style="zoom: 67%;" />
 
 
 
@@ -1005,7 +1005,7 @@ var sphereEmitter = particleSystem.createSphereEmitter(1.2);
 var sphereEmitter = particleSystem.createDirectedSphereEmitter(1.2, new BABYLON.Vector3(1, 1, 1), new BABYLON.Vector3(2, 8, 2));
 ````
 
-![image-20210301205044118](img\image-20210301205044118.png)
+![image-20210301205044118](img/image-20210301205044118.png)
 
 #### Hemispheric Emitter
 
@@ -1015,7 +1015,7 @@ var sphereEmitter = particleSystem.createDirectedSphereEmitter(1.2, new BABYLON.
 var hemisphericEmitter = particleSystem.createHemisphericEmitter(1.2);
 ```
 
-![image-20210301205225497](img\image-20210301205225497.png)
+![image-20210301205225497](img/image-20210301205225497.png)
 
 
 
@@ -1027,7 +1027,7 @@ var hemisphericEmitter = particleSystem.createHemisphericEmitter(1.2);
 var cylinderEmitter = particleSystem.createCylinderEmitter(1,1,0,0);
 `````
 
-<img src="img\image-20210301205328286.png" alt="image-20210301205328286" style="zoom:50%;" />
+<img src="img/image-20210301205328286.png" alt="image-20210301205328286" style="zoom:50%;" />
 
 
 
@@ -1037,7 +1037,7 @@ var cylinderEmitter = particleSystem.createCylinderEmitter(1,1,0,0);
 var coneEmitter = particleSystem.createConeEmitter(2, Math.PI / 3);
 ````
 
-![image-20210301205504276](img\image-20210301205504276.png)
+![image-20210301205504276](img/image-20210301205504276.png)
 
 
 
@@ -1051,7 +1051,7 @@ var meshEmitter = new BABYLON.MeshParticleEmitter(sphere);
 
 **Please note that the MeshParticleEmitter is not supported by GPU Particle**
 
-![image-20210301205929882](img\image-20210301205929882.png)
+![image-20210301205929882](img/image-20210301205929882.png)
 
 
 
@@ -1081,7 +1081,7 @@ particleSystem.isAnimationSheetEnabled = true; //after construction
     particleSystem.spriteCellLoop = true;
 ````
 
-![image-20210301211723381](img\image-20210301211723381.png)
+![image-20210301211723381](img/image-20210301211723381.png)
 
 ## Animation
 
