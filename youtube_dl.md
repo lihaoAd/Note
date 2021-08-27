@@ -4,7 +4,7 @@
 python -m youtube_dl -F https://www.youtube.com/watch?v=SpZqeVqtMKk&t=164s
 ````
 
-![image-20210202140953807](.\img\image-20210202140953807.png)
+![image-20210202140953807](./img/image-20210202140953807.png)
 
 
 
@@ -12,7 +12,7 @@ python -m youtube_dl -F https://www.youtube.com/watch?v=SpZqeVqtMKk&t=164s
 python -m youtube_dl --list-formats "https://www.youtube.com/watch?v=SpZqeVqtMKk&t=164s"
 `````
 
-![image-20210202141150906](.\img\image-20210202141150906.png)
+![image-20210202141150906](./img/image-20210202141150906.png)
 
 ## 下载指定质量的视频和音频并自动合并
 
@@ -28,4 +28,4 @@ youtube-dl -f [format code] [url]
 
 
 
-![image-20210202142223321](.\img\image-20210202142223321.png)
+![image-20210202142223321](./img/image-20210202142223321.png)

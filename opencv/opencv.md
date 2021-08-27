@@ -103,7 +103,7 @@ cv.waitKey(0)
 cv.destroyAllWindows()
 ```
 
-<img src=".\img\image-20210222103813629.png" alt="image-20210222103813629" style="zoom:30%;" />
+<img src="./img/image-20210222103813629.png" alt="image-20210222103813629" style="zoom:30%;" />
 
 
 ### 绘制圆形
@@ -131,7 +131,7 @@ cv.waitKey(0)
 cv.destroyAllWindows()
 ```
 
-<img src=".\img\image-20210222104141189.png" alt="image-20210222104141189" style="zoom:30%;" />
+<img src="./img/image-20210222104141189.png" alt="image-20210222104141189" style="zoom:30%;" />
 
 ### 绘制矩形
 
@@ -156,7 +156,7 @@ cv.imshow('rectangl2', img2)
 cv.waitKey(0)
 cv.destroyAllWindows()
 ```
-<img src=".\img\image-20210222104550581.png" alt="image-20210222104550581" style="zoom:30%;" />
+<img src="./img/image-20210222104550581.png" alt="image-20210222104550581" style="zoom:30%;" />
 
 ### 绘制椭圆
 
@@ -181,7 +181,7 @@ cv.imshow('ellipse2', img2)
 cv.waitKey(0)
 cv.destroyAllWindows()
 ```
-<img src=".\img\image-20210222104756176.png" alt="image-20210222104756176" style="zoom:30%;" />
+<img src="./img/image-20210222104756176.png" alt="image-20210222104756176" style="zoom:30%;" />
 
 ### 绘制任意多边形
 
@@ -209,7 +209,7 @@ cv.waitKey(0)
 cv.destroyAllWindows()
 ```
 
-<img src=".\img\image-20210222105906257.png" alt="image-20210222105906257" style="zoom:30%;" />
+<img src="./img/image-20210222105906257.png" alt="image-20210222105906257" style="zoom:30%;" />
 
 ### 绘制文字
 
@@ -231,7 +231,7 @@ cv.imshow('text', img)
 cv.waitKey(0)
 cv.destroyAllWindows()
 ```
-<img src=".\img\image-20210222110453154.png" alt="image-20210222110453154" style="zoom:30%;" />
+<img src="./img/image-20210222110453154.png" alt="image-20210222110453154" style="zoom:30%;" />
 
 ## 图像的基本属性
 
@@ -390,7 +390,7 @@ cv.imshow('opencv', img)
 cv.waitKey(0)
 cv.destroyAllWindows()
 ```
-<img src=".\img\image-20210221194145195.png" alt="image-20210221194145195" style="zoom:30%;" />
+<img src="./img/image-20210221194145195.png" alt="image-20210221194145195" style="zoom:30%;" />
 
 
 
@@ -414,7 +414,7 @@ cv.destroyAllWindows()
 
 `D邻接`和`8邻接`
 
-<img src=".\img\image-20210221221736806.png" alt="image-20210221221736806" style="zoom:100%;" />
+<img src="./img/image-20210221221736806.png" alt="image-20210221221736806" style="zoom:100%;" />
 
 - 4邻接 :像素p（x,y）的4邻域是：（x+1,y）、(x-1,y)、（x,y-1）、（x,y+1）,
 
@@ -474,7 +474,7 @@ cv.waitKey(0)
 cv.destroyAllWindows()
 ```
 
-![image-20210221233117203](.\img\image-20210221233117203.png)
+![image-20210221233117203](./img/image-20210221233117203.png)
 
 
 
@@ -496,7 +496,7 @@ cv.waitKey(0)
 cv.destroyAllWindows()
 ```
 
-![image-20210221233243942](.\img\image-20210221233243942.png)
+![image-20210221233243942](./img/image-20210221233243942.png)
 
 #### 开闭运算
 
@@ -519,7 +519,7 @@ cv.destroyAllWindows()
 
 
 
-![image-20210221235153020](.\img\image-20210221235153020.png)
+![image-20210221235153020](./img/image-20210221235153020.png)
 
 
 
@@ -538,7 +538,7 @@ cv.destroyAllWindows()
 
 
 
-![image-20210221235256769](.\img\image-20210221235256769.png)
+![image-20210221235256769](./img/image-20210221235256769.png)
 
 #### 礼帽和黑帽
 
@@ -567,7 +567,7 @@ cv.destroyAllWindows()
 
 
 
-![image-20210222000658870](.\img\image-20210222000658870.png)
+![image-20210222000658870](./img/image-20210222000658870.png)
 
 
 
@@ -586,7 +586,7 @@ cv.destroyAllWindows()
 
 
 
-![image-20210222000816564](.\img\image-20210222000816564.png)
+![image-20210222000816564](./img/image-20210222000816564.png)
 
 
 
@@ -616,7 +616,7 @@ plt.xticks([]),plt.yticks([])
 plt.show()
 ```
 
-![image-20210222203540619](img\image-20210222203540619.png)
+![image-20210222203540619](img/image-20210222203540619.png)
 
 ### 高斯滤波
 
@@ -665,7 +665,7 @@ plt.grid()
 plt.show()
 ```
 
-![image-20210222210157100](img\image-20210222210157100.png)
+![image-20210222210157100](img/image-20210222210157100.png)
 
 ### 掩膜
 
@@ -723,7 +723,7 @@ axes[1,1].set_title("灰度直方图")
 plt.show()
 ```
 
-![image-20210222212623138](img\image-20210222212623138.png)
+![image-20210222212623138](img/image-20210222212623138.png)
 
 ### 直方图均衡化
 
@@ -750,7 +750,7 @@ axes[1].axis("off")
 plt.show()
 ```
 
-![image-20210222220537593](img\image-20210222220537593.png)
+![image-20210222220537593](img/image-20210222220537593.png)
 
 ## 边缘检测
 
@@ -813,7 +813,7 @@ plt.xticks([]),plt.yticks([])
 plt.show()
 ```
 
-![image-20210224192148156](img\image-20210224192148156.png)
+![image-20210224192148156](img/image-20210224192148156.png)
 
 
 ### Scharr算子
@@ -849,7 +849,7 @@ x = cv.Sobel(img,cv.CV_16S,1,0,ksize=-1)
 y = cv.Sobel(img,cv.CV_16S,0,1,ksize=-1)
 ```
 
-![image-20210224192218136](img\image-20210224192218136.png)
+![image-20210224192218136](img/image-20210224192218136.png)
 
 
 
@@ -884,7 +884,7 @@ plt.xticks([]),plt.yticks([])
 plt.show()
 ```
 
-![image-20210224192249854](img\image-20210224192249854.png)
+![image-20210224192249854](img/image-20210224192249854.png)
 
 
 
@@ -907,7 +907,7 @@ plt.xticks([]), plt.yticks([])
 plt.show()
 ```
 
-![image-20210224193221884](img\image-20210224193221884.png)
+![image-20210224193221884](img/image-20210224193221884.png)
 
 
 
@@ -933,7 +933,7 @@ plt.yticks([])
 plt.show()
 ```
 
-![image-20210224202248935](img\image-20210224202248935.png)
+![image-20210224202248935](img/image-20210224202248935.png)
 
 
 
@@ -970,7 +970,7 @@ plt.yticks([])
 plt.show()
 ```
 
-![image-20210224223919132](img\image-20210224223919132.png)
+![image-20210224223919132](img/image-20210224223919132.png)
 
 ```python
 img = cv.imread("test11.jpg")
@@ -990,7 +990,7 @@ plt.yticks([])
 plt.show()
 ```
 
-![image-20210224230435253](img\image-20210224230435253.png)
+![image-20210224230435253](img/image-20210224230435253.png)
 
 ## 图像特征
 
@@ -1024,7 +1024,7 @@ plt.yticks([])
 plt.show()
 ```
 
-![image-20210224233619246](img\image-20210224233619246.png)
+![image-20210224233619246](img/image-20210224233619246.png)
 
 #### Shi-Tomas角点检测
 
@@ -1045,7 +1045,7 @@ plt.yticks([])
 plt.show()
 ```
 
-![image-20210225103440390](img\image-20210225103440390.png)
+![image-20210225103440390](img/image-20210225103440390.png)
 
 #### SIFT算法
 

@@ -12,11 +12,11 @@
 
   文本模式下显存物理地址范围为 0xb8000～0xbffff，  在 80 * 25 文本模式下屏幕可显示 2000 个字（字符），4000 字节的内容。显存有 32KB，按理说显存中可以存放 32KB/4000B约等于 8 屏的字符。这就是为什么 Linux 可以用 alt + Fn 键实现 tty 的切换  
 
-<img src="img\image-20210609220902315.png" alt="image-20210609220902315" style="zoom:50%;" />
+<img src="img/image-20210609220902315.png" alt="image-20210609220902315" style="zoom:50%;" />
 
 屏幕上每个字符的低字节是字符的 ASCII 码，高字节是字符属性元信息。在高字节中，低 4 位是字符前景色，高 4 位是字符的背景色。颜色用 RGB 红绿蓝三种基色调和，第 4 位用来控制亮度，若置 1 则呈高亮，若为 0 则为一般正常亮度值。第 7 位用来控制字符是否闪烁（不是背景闪烁）。  
 
-<img src="img\image-20210609221707528.png" alt="image-20210609221707528" style="zoom:50%;" />
+<img src="img/image-20210609221707528.png" alt="image-20210609221707528" style="zoom:50%;" />
 
 [int 10 AH=3](http://www.ctyme.com/intr/rb-0088.htm)
 
@@ -29,7 +29,7 @@
 	mov	[0],dx		! 把光标位置放在ds:[0]即 0x9000:0x0000这个位置,占2个字节
 ```
 
-​                                                    <img src="img\image-20210609220025033.png" alt="image-20210609220025033" style="zoom: 80%;" />
+​                                                    <img src="img/image-20210609220025033.png" alt="image-20210609220025033" style="zoom: 80%;" />
 
 
 
@@ -52,13 +52,13 @@ int	0x15
 mov	[2],ax    ! ds:[2]即 0x9000:0x0002这个位置存着扩展内存的大小（kB）
 ```
 
-<img src="img\image-20210609225513729.png" alt="image-20210609225513729" style="zoom:80%;" />
+<img src="img/image-20210609225513729.png" alt="image-20210609225513729" style="zoom:80%;" />
 
 ## 显卡
 
 [显卡的显示模式](http://vitaly_filatov.tripod.com/ng/asm/asm_023.1.html),或者到[这里](http://www.ctyme.com/intr/rb-0069.htm)找资料，
 
-<img src="C:\Users\LIHAO\Desktop\Slash\linux\0.11\img\image-20210609231143923.png" alt="image-20210609231143923" style="zoom: 50%;" />
+<img src="C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210609231143923.png" alt="image-20210609231143923" style="zoom: 50%;" />
 
 ```c++
 ! Get video-card data:
@@ -68,7 +68,7 @@ mov	[2],ax    ! ds:[2]即 0x9000:0x0002这个位置存着扩展内存的大小�
 	mov	[6],ax		! al = video mode, ah = window width 
 ```
 
-<img src="img\image-20210609231422147.png" alt="image-20210609231422147" style="zoom:80%;" />
+<img src="img/image-20210609231422147.png" alt="image-20210609231422147" style="zoom:80%;" />
 
 ```c++
 
@@ -83,9 +83,9 @@ mov	[2],ax    ! ds:[2]即 0x9000:0x0002这个位置存着扩展内存的大小�
 	
 ```
 
-<img src="C:\Users\LIHAO\Desktop\Slash\linux\0.11\img\image-20210609232149619.png" alt="image-20210609232149619" style="zoom: 50%;" />
+<img src="C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210609232149619.png" alt="image-20210609232149619" style="zoom: 50%;" />
 
-<img src="C:\Users\LIHAO\Desktop\Slash\linux\0.11\img\image-20210609232338774.png" alt="image-20210609232338774" style="zoom:80%;" />
+<img src="C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210609232338774.png" alt="image-20210609232338774" style="zoom:80%;" />
 
 
 
@@ -140,7 +140,7 @@ no_disk1:
 
 这里补充一点关于 `movsb、movsw`的知识，因为后面的代码会用到相关知识， 这两个指令通常用于把数据从内存中的一个地方批量地传送（复制）到另一个地方，处理器把它们看成数据串。但是，`movsb`的传送是以字节为单位的，而`movsw`的传送是以字为单位的。 `movsb`和`movsw`指令执行时，原始数据串的段地址由`DS`指定，偏移地址由`SI`指定，简写`DS：SI`；要传送到的目的地址由`ES：DI`指定；传送的字节数（movsb）或者字数（movsw）由`CX`指定。除此之外，还要指定是正向传送还是反向传送，正向传送是指传送操作的方向是从内存区域的低地址端到高地址端；反向传送则正好相反。正向传送时，每传送一个字节（movsb）或者一个字（movsw），`SI`和`DI`加1或者加2；反向传送时，每传送一个字节（movsb）或者一个字（movsw）时，`SI`和`DI`减去1或者减去2。不管是正向传送还是反向传送，也不管每次传送的是字节还是字，每传送一次，`CX`的内容自动减1。 标志寄存器的第10位是方向标志`DF（Direction Flag）`，`DF=0`表示正向传送，`DF=1`表示反向传送。 `cld`指令将DF标志清零，`std`指令将DF标志置1
 
-<img src="img\image-20210610222949529.png" alt="image-20210610222949529" style="zoom: 50%;" />
+<img src="img/image-20210610222949529.png" alt="image-20210610222949529" style="zoom: 50%;" />
 
 图片来源https://stanislavs.org/helppc/int_13-15.html
 
@@ -196,7 +196,7 @@ end_move:
 
 ## "8042" PS/2 Controller
 
-<img src="img\Ps-2-ports.JPG" alt="image-20210610222949529"  />
+<img src="img/Ps-2-ports.JPG" alt="image-20210610222949529"  />
 
 **PS/2接口**是一种[PC兼容型](https://zh.wikipedia.org/wiki/PC相容型)电脑系统上的接口，可以用来链接[键盘](https://zh.wikipedia.org/wiki/鍵盤)及[鼠标](https://zh.wikipedia.org/wiki/滑鼠)。PS/2的命名来自于1987年时IBM所推出的[个人电脑](https://zh.wikipedia.org/wiki/個人電腦)：[PS/2](https://zh.wikipedia.org/wiki/PS/2)系列。PS/2鼠标连接通常用来取代旧式的序列鼠标接口（[DB-9](https://zh.wikipedia.org/w/index.php?title=DB-9&action=edit&redlink=1) [RS-232](https://zh.wikipedia.org/wiki/RS-232)）；而PS/2键盘连接则用来取代为[IBM PC/AT](https://zh.wikipedia.org/wiki/IBM_PC/AT)所设计的大型5-pin [DIN接口](https://zh.wikipedia.org/wiki/DIN连接器)。PS/2的键盘及鼠标接口在电气特性上十分类似，其中主要的差别在于键盘接口需要双向的沟通。在早期如果对调键盘和鼠标的插槽，大部分的台式机[主板](https://zh.wikipedia.org/wiki/主機板)不能将其正确识别。现在已经出现共享接口，能够随意插入键盘或鼠标并正确识别处理。
 
@@ -208,7 +208,7 @@ end_move:
 
 端口 0x60（数据端口）用于向/从 PS/2（键盘）控制器或 PS/2 设备本身发送数据。
 
-<img src="img\image-20210611235008882.png" alt="image-20210611235008882" style="zoom: 80%;" />
+<img src="img/image-20210611235008882.png" alt="image-20210611235008882" style="zoom: 80%;" />
 
 ````c++
 empty_8042:
@@ -219,7 +219,7 @@ empty_8042:
 	ret
 ````
 
-![image-20210611234754356](img\image-20210611234754356.png)
+![image-20210611234754356](img/image-20210611234754356.png)
 
 
 
@@ -254,7 +254,7 @@ gdt_48:
 	.word	512+gdt,0x9	! gdt base = 0X9xxxx
 ```
 
-![img](img\5477b7a42f4142f7ab6a298faed29476~tplv-k3u1fbpfcp-watermark.image)
+![img](img/5477b7a42f4142f7ab6a298faed29476~tplv-k3u1fbpfcp-watermark.image)
 
 
 
@@ -262,17 +262,17 @@ gdt_48:
 
 存储中断描述符表的寄存器是IDTR，48位，存储全局描述符表的寄存器是GDTR，48位，这 48 位内存数据划分为两部分，其中前 16 位是 GDT 以字节为单位的界限值，所以这 16 位相当于GDT 的字节大小减 1。后 32 位是 GDT 的起始地址。由于 GDT 的大小是 16 位二进制，其表示的范围是 2的16次方等于65536字节。每个描述符大小是8字节，故， GDT中最多可容纳的描述符数量是65536/8=8192个，即 GDT 中可容纳 8192 个段或门。  
 
-![image-20210610234755785](C:\Users\LIHAO\Desktop\Slash\linux\0.11\img\image-20210610234755785.png)
+![image-20210610234755785](C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210610234755785.png)
 
 
 
 无论是中断描述符表还是全局描述符表，里面存的都是段描述符，一个段描述符大小是64字节。
 
-<img src="img\image-20210610235122127.png" alt="image-20210610235122127" style="zoom: 67%;" />
+<img src="img/image-20210610235122127.png" alt="image-20210610235122127" style="zoom: 67%;" />
 
 实模式下寻址是段地址+偏移地址，段寄存器中存的是段地址，到了保护模式下，段寄存器中存的是段选择子，如果把全局描述符表看成一个数组，选择子就是关于这个数组的索引,这个索引大小是13位的，即 2 的 13 次方是 8192，故最多可以索引 8192 个段，这和 GDT中最多定义 8192 个描述符是吻合的。  
 
-![image-20210610235429509](img\image-20210610235429509.png)
+![image-20210610235429509](img/image-20210610235429509.png)
 
 再来看看 idt_48 处的数据，加载idt_48 到IDTR寄存器后，idt limit = 0 ，现在还没用到中断，大小是0，idt base address 也是0，这里也就是默认创建一个idt，只不过大小是0，加载gdt_48到GDTR后，gdt limit=2048,表示可以有256个段描述符，512+gdt,0x9表示
 
@@ -280,7 +280,7 @@ GDT 中的第 0 个段描述符是不可用的，原因是定义在 GDT 中的�
 
 - S 字段，用来指出当前描述符是否是系统段。S 为 0 表示系统段， S 为 1 表示非系统段  ,S字段与Type字段结合起来才能知道这是一个什么段
 
-![image-20210611230401119](C:\Users\LIHAO\Desktop\Slash\linux\0.11\img\image-20210611230401119.png)
+![image-20210611230401119](C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210611230401119.png)
 
 表中的 A 位表示 Accessed 位，这是由 CPU 来设置的，每当该段被 CPU 访问过后， CPU 就将此位置 1。所以，创建一个新段描述符时，应该将此位置 0。  
 
@@ -339,7 +339,7 @@ jmpi	0,8		! jmp offset 0 of segment 8 (cs)
 ```
 前面我们准备了GDT，打开了A20，现在就差一部就可以进入保护模式，就是将CR0控制寄存器的PE置为1。lmsw就是把源操作数加载到CR0.。然后执行跳转，CS寄存器中的值就是8，此时已经是保护模式，这里的8已经不是段地址，而是段选择子，8的16位二进制数是 0000 1000b，RPL=0表示内核态，TI=0表示段描述符在GDT中，index=1，即GDT的第2个段描述符，也就是内核的代码段。该段的基址地址是0，
 
-+<img src="img\image-20210612212932379.png" alt="image-20210612212932379" style="zoom:80%;" />
++<img src="img/image-20210612212932379.png" alt="image-20210612212932379" style="zoom:80%;" />
 
 [图片来源: 英特尔® 64 位和 IA-32 架构开发人员手册：卷 3A](https://www.intel.cn/content/www/cn/zh/architecture-and-technology/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.html)第76页
 

@@ -48,7 +48,7 @@ x87协处理器：为了弥补x86系列在进行浮点运算时的不足，Intel
 
 此时还没分页，任然使用段基址 + 偏移地址进行寻址，先把256个中断描述符置为哑门，后面等到main中再次初始化。
 
-![image-20210613094454698](img\image-20210613094454698.png)
+![image-20210613094454698](img/image-20210613094454698.png)
 
 ````c++
 setup_idt:
@@ -75,7 +75,7 @@ idt:	.fill 256,8,0		# idt is uninitialized
 
 
 
-![img](img\5477b7a42f4142f7ab6a298faed29476~tplv-k3u1fbpfcp-watermark.image)
+![img](img/5477b7a42f4142f7ab6a298faed29476~tplv-k3u1fbpfcp-watermark.image)
 
 ```c++
 # idtr寄存器是一个48位的
@@ -108,7 +108,7 @@ gdt_descr:
 	.long gdt		# magic number, but it works for me :^)
 `````
 
-<img src="img\image-20210610235122127.png" alt="image-20210610235122127" style="zoom: 67%;" />  
+<img src="img/image-20210610235122127.png" alt="image-20210610235122127" style="zoom: 67%;" />  
 
 - 0x00c09a0000000fff:
 
@@ -172,7 +172,7 @@ pg3:
 
 先把页目录项填写好
 
-<img src="img\image-20210613172910751.png" alt="image-20210613172910751" style="zoom:67%;" />
+<img src="img/image-20210613172910751.png" alt="image-20210613172910751" style="zoom:67%;" />
 
 ````c++
 setup_paging:
@@ -199,12 +199,12 @@ setup_paging:
 	ret			/* this also flushes prefetch-queue */
 ````
 
-![image-20210613194710758](img\image-20210613194710758.png)
+![image-20210613194710758](img/image-20210613194710758.png)
 
 
 
 
 
-![image-20210613164825105](img\image-20210613164825105.png)
+![image-20210613164825105](img/image-20210613164825105.png)
 
 4 字节大小，但其内容并不全是物理地址，只有第12～31 位才是物理地址，这才20 位，因该是32位啊~， 因为页目录项和页表项中的都是物理页地址，标准页大小是4KB，故地址都是4K 的倍数，也就是地址的低12 位是0，所以只需要记录物理地址高20 位就可以啦。这样省出来的12 位。

@@ -1,16 +1,16 @@
 ## Field Descriptor
 
-![image-20210203150720586](.\img\image-20210203150720586.png)
+![image-20210203150720586](./img/image-20210203150720586.png)
 
 ## Method Descriptor 
 
-![image-20210203150818337](.\img\image-20210203150818337.png)
+![image-20210203150818337](./img/image-20210203150818337.png)
 
 
 
 ## ClassFile Struct
 
-![image-20210203140634902](.\img\image-20210203140634902.png)
+![image-20210203140634902](./img/image-20210203140634902.png)
 
 ### magic
 
@@ -24,23 +24,23 @@
 
 
 
-![image-20210203144534637](.\img\image-20210203144534637.png)
+![image-20210203144534637](./img/image-20210203144534637.png)
 
 
 
-![image-20210203144707148](.\img\image-20210203144707148.png)
+![image-20210203144707148](./img/image-20210203144707148.png)
 
 #### CONSTANT_Class_info
 
 The `CONSTANT_Class_info` structure is used to represent a class or an interface
 
-![image-20210203145146226](.\img\image-20210203145146226.png)
+![image-20210203145146226](./img/image-20210203145146226.png)
 
 The value of the `name_index` item must be a valid index into the `constant_pool` table. The `constant_pool` entry at that index must be a `CONSTANT_Utf8_info` structure
 
 #### CONSTANT_Fieldref_info
 
-![image-20210203145124442](.\img\image-20210203145124442.png)
+![image-20210203145124442](./img/image-20210203145124442.png)
 
 The value of the `class_index` item must be a valid index into the `constant_pool` table. The `constant_pool entry` at that index must be a `CONSTANT_Class_info` structure representing a class or interface type that has the field or method as a member.
 
@@ -50,7 +50,7 @@ The value of the `name_and_type_index` item must be a valid index into the `cons
 
 #### CONSTANT_Methodref_info
 
-![image-20210203145242327](.\img\image-20210203145242327.png)
+![image-20210203145242327](./img/image-20210203145242327.png)
 
 The value of the `class_index` item must be a valid index into the `constant_pool` table. The `constant_pool entry` at that index must be a `CONSTANT_Class_info` structure representing a class or interface type that has the field or method as a member.
 
@@ -60,13 +60,13 @@ The value of the `name_and_type_index` item must be a valid index into the `cons
 
 In a `CONSTANT_Fieldref_info`, the indicated descriptor must be a field descriptor . Otherwise, the indicated descriptor must be a method descriptor .
 
-If the name of the method of a` CONSTANT_Methodref_info` structure begins with a `'<' ('\u003c')`, then the name must be the special name `<init>`, representing an instance initialization method . The return type of such a method must be `void`.
+If the name of the method of a` CONSTANT_Methodref_info` structure begins with a `'<' ('/u003c')`, then the name must be the special name `<init>`, representing an instance initialization method . The return type of such a method must be `void`.
 
 
 
 #### CONSTANT_InterfaceMethodref_info
 
-![image-20210203145318507](.\img\image-20210203145318507.png)
+![image-20210203145318507](./img/image-20210203145318507.png)
 
 The value of the `class_index` item must be a valid index into the `constant_pool` table. The `constant_pool entry` at that index must be a `CONSTANT_Class_info` structure representing a class or interface type that has the field or method as a member.
 
@@ -80,33 +80,33 @@ The value of the `name_and_type_index` item must be a valid index into the `cons
 
 字符串常量
 
-![image-20210203151500164](.\img\image-20210203151500164.png)
+![image-20210203151500164](./img/image-20210203151500164.png)
 
 The value of the `string_index` item must be a valid index into the `constant_pool` table. The `constant_pool `entry at that index must be a `CONSTANT_Utf8_info` structure representing the sequence of Unicode code points to which the String object is to be initialized.
 
 #### CONSTANT_Integer_info
 
-![image-20210203151712111](.\img\image-20210203151712111.png)
+![image-20210203151712111](./img/image-20210203151712111.png)
 
 The bytes item of the CONSTANT_Integer_info structure represents the value of the int constant. The bytes of the value are stored in big-endian (high byte first) order.
 
 ####  CONSTANT_Float_info
 
-![image-20210203151819439](.\img\image-20210203151819439.png)
+![image-20210203151819439](./img/image-20210203151819439.png)
 
 The bytes item of the CONSTANT_Float_info structure represents the value of the float constant in IEEE 754 floating-point single format. The bytes of the single format representation are stored in big-endian (high byte first) order.
 
 #### CONSTANT_Long_info
 
-![image-20210203152305171](.\img\image-20210203152305171.png)
+![image-20210203152305171](./img/image-20210203152305171.png)
 
 ####  CONSTANT_Double_info
 
-![image-20210203152322549](.\img\image-20210203152322549.png)
+![image-20210203152322549](./img/image-20210203152322549.png)
 
 #### CONSTANT_NameAndType_info
 
-![image-20210203152505970](.\img\image-20210203152505970.png)
+![image-20210203152505970](./img/image-20210203152505970.png)
 
 The value of the `name_index` item must be a valid index into the `constant_pool `table. The constant_pool entry at that index must be a`CONSTANT_Utf8_info` structure representing either the special method name  or a valid unqualified name denoting a field or method
 
@@ -114,13 +114,13 @@ The value of the `descriptor_index` item must be a valid index into the constant
 
 #### CONSTANT_Utf8_info 
 
-![image-20210203152739779](.\img\image-20210203152739779.png)
+![image-20210203152739779](./img/image-20210203152739779.png)
 
 
 
 #### CONSTANT_MethodHandle_info
 
-![image-20210203152939782](.\img\image-20210203152939782.png)
+![image-20210203152939782](./img/image-20210203152939782.png)
 
 The value of the `reference_kind` item must be in the range `1 to 9`. The value denotes the kind of this method handle, which characterizes its bytecode behavior
 
@@ -140,13 +140,13 @@ The value of the` reference_index` item must be a valid index into the `constant
 
 #### CONSTANT_MethodType_info
 
-![image-20210203153906733](.\img\image-20210203153906733.png)
+![image-20210203153906733](./img/image-20210203153906733.png)
 
 The value of the `descriptor_index` item must be a valid index into the constant_pool table. The constant_pool entry at that index must be a CONSTANT_Utf8_info structure representing a `method descriptor`
 
 #### CONSTANT_InvokeDynamic_info
 
-![image-20210203154124849](.\img\image-20210203154124849.png)
+![image-20210203154124849](./img/image-20210203154124849.png)
 
 The value of the bootstrap_method_attr_index item must be a valid index into the bootstrap_methods array of the bootstrap method table  of this class file.
 
@@ -166,7 +166,7 @@ An annotation type must have its `ACC_ANNOTATION` flag set. If the `ACC_ANNOTATI
 
 The `ACC_ENUM` flag indicates that this class or its superclass is declared as an enumerated type.
 
-![image-20210203142232671](.\img\image-20210203142232671.png)
+![image-20210203142232671](./img/image-20210203142232671.png)
 
 
 
@@ -188,7 +188,7 @@ The `ACC_ENUM` flag indicates that this class or its superclass is declared as a
 
 每一项都是`field_info`的结构
 
-![image-20210203154404516](.\img\image-20210203154404516.png)
+![image-20210203154404516](./img/image-20210203154404516.png)
 
 
 

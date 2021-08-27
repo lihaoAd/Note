@@ -2,7 +2,7 @@
 
 朴素字符串比较就是主串T与匹配串P一个一个字符进行比较，假设主串有m个字符，匹配串有n个字符，那么就要比较（m-n+1）n个（m>n）
 
-<img src="C:\Users\LIHAO\Desktop\Slash\arithmetic\img\image-20210620085705141.png" alt="image-20210620085705141" style="zoom: 50%;" />
+<img src="/img/image-20210620085705141.png" alt="image-20210620085705141" style="zoom: 50%;" />
 
 ```java
 public static int simple(String t, String p) {
@@ -34,11 +34,11 @@ public static int simple(String t, String p) {
 
 主串的每个字符都要与匹配串进行比较，其实并没有必要
 
-<img src="img\image-20210620090031087.png" alt="image-20210620090031087" style="zoom:50%;" />
+<img src="img/image-20210620090031087.png" alt="image-20210620090031087" style="zoom:50%;" />
 
 a与b不匹配，匹配串每次移动一个位置，简称滑动，已经明知道匹配串的第一个位置的字符b不匹配主串的第1与第2位置的字符a，如果直接匹配b，跳过主串不匹配的字符。
 
-<img src="img\image-20210620092000241.png" alt="image-20210620092000241" style="zoom:50%;" />
+<img src="img/image-20210620092000241.png" alt="image-20210620092000241" style="zoom:50%;" />
 
 
 
@@ -62,19 +62,19 @@ a与b不匹配，匹配串每次移动一个位置，简称滑动，已经明知
 
 
 
-<img src="img\image-20210620092138523.png" alt="image-20210620092138523" style="zoom:50%;" />
+<img src="img/image-20210620092138523.png" alt="image-20210620092138523" style="zoom:50%;" />
 
 ​		首先T[0]与P[0]不匹配，并且下一个T[1]与P[1]是匹配的，按照人类的想法，就是把P向右移动一位。
 
-<img src="img\image-20210620092226176.png" alt="image-20210620092226176" style="zoom:50%;" />
+<img src="img/image-20210620092226176.png" alt="image-20210620092226176" style="zoom:50%;" />
 
 T[1]== P[0]、T[2] == P[1]、T[3] == P[2] ，但是T[4] ≠ P[3]
 
-<img src="img\image-20210620092257334.png" alt="image-20210620092257334" style="zoom:50%;" />
+<img src="img/image-20210620092257334.png" alt="image-20210620092257334" style="zoom:50%;" />
 
 按照之前的朴素算法，P这个时候就要向右移动一位，并且i指针又开始回去了，做了重复的计算。
 
-<img src="img\image-20210620092452450.png" alt="image-20210620092452450" style="zoom:50%;" />
+<img src="img/image-20210620092452450.png" alt="image-20210620092452450" style="zoom:50%;" />
 
 i指针可以不用向前回退，那就要让j指针回退。上图中T[4] ≠ P[3]，但是P[3]之前的肯定是匹配的，就是aba，其前缀是a、ab；后缀是ba、a，前缀与后缀可以重合的就只有a，那么最大可重合元素数就是1,
 
@@ -89,11 +89,11 @@ i指针可以不用向前回退，那就要让j指针回退。上图中T[4] ≠ 
 ababab
 前缀：a、ab、aba、abab、ababa；后缀：babab、abab、baba、ab、b；最大重合数：4
 
-<img src="img\image-20210620101449356.png" alt="image-20210620101449356" style="zoom:50%;" />
+<img src="img/image-20210620101449356.png" alt="image-20210620101449356" style="zoom:50%;" />
 
 
 
-<img src="img\image-20210620102957187.png" alt="image-20210620102957187" style="zoom:50%;" />
+<img src="img/image-20210620102957187.png" alt="image-20210620102957187" style="zoom:50%;" />
 
 这样操作的含义：
 
@@ -105,11 +105,11 @@ ababab
 
 假设有一个匹配串abad
 
-<img src="img\image-20210620105000857.png" alt="image-20210620105000857" style="zoom:50%;" />
+<img src="img/image-20210620105000857.png" alt="image-20210620105000857" style="zoom:50%;" />
 
 在T[3]这里不匹配，找到前面的字串aba，aba的前缀：a、ab；后缀ba、a；最大重合数是1（就是首尾的a），j回溯到1后与i比较，此时j前面的子串已经达到和T重合的最大数量。注意i可没有回溯。
 
-<img src="img\image-20210620105219883.png" alt="image-20210620105219883" style="zoom:50%;" />
+<img src="img/image-20210620105219883.png" alt="image-20210620105219883" style="zoom:50%;" />
 
 
 
@@ -165,7 +165,7 @@ ababab
 
 如果 j =9 处不匹配，P[8] = a；next[7] =2, P[2] = a, 因为P[8]  ==  P[2] ， 则  next[8]=next[7] +1 = 3；
 
-![image-20210620133546290](img\image-20210620133546290.png)
+![image-20210620133546290](img/image-20210620133546290.png)
 
 ```java
 public static int[] getNext(String ps) {

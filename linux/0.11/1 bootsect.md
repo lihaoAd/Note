@@ -14,7 +14,7 @@ bios 启动后会把磁盘的第一个扇区读取到内存中，然后把cpu的
 
 把一个扇区的数据复制到段0x9000段后，将段寄存器ds、es、ss都设置为0x9000，栈定设置为0x9000:0xFF00。
 
-<img src="\img\image-20210606154222650.png" alt="image-20210606154222650" style="zoom:50%;" />
+<img src="/img/image-20210606154222650.png" alt="image-20210606154222650" style="zoom:50%;" />
 
 ````java
 _start:
@@ -41,7 +41,7 @@ go:	mov	ax,cs     ! jmpi后，cs=0x9000，即ax = 0x9000
 
 [int 13，AH=2](http://www.ctyme.com/intr/rb-0607.htm),把扇区的数据读取到内存，BIOS已经把第一个扇区读取到内存了，接下来读取4个扇区的数据到 0x9000：0x0200。
 
-<img src="\img\image-20210606154613719.png" alt="image-20210606154613719" style="zoom:50%;" />
+<img src="/img/image-20210606154613719.png" alt="image-20210606154613719" style="zoom:50%;" />
 
 ```c++
 load_setup:
@@ -60,7 +60,7 @@ load_setup:
 
 关于int 13的描述如下：
 
-<img src="img\image-20210401151724247.png" alt="image-20210401151724247" style="zoom:50%;" />
+<img src="img/image-20210401151724247.png" alt="image-20210401151724247" style="zoom:50%;" />
 
 
 
@@ -83,7 +83,7 @@ ok_load_setup:
 	mov	es,ax           ! es = 0x9000
 ````
 
-<img src="\img\image-20210606155448947.png" alt="image-20210606155448947" style="zoom:50%;" />
+<img src="/img/image-20210606155448947.png" alt="image-20210606155448947" style="zoom:50%;" />
 
 ```java
     ! int 0x10中断 功能号ah=0x03,读取光标位置
@@ -113,7 +113,7 @@ ok_load_setup:
 
 
 
-![image-20210606163541045](img\image-20210606163541045.png)
+![image-20210606163541045](img/image-20210606163541045.png)
 
 
 

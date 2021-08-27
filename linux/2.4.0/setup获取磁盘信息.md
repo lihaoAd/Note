@@ -51,7 +51,7 @@
 	
 ```
 
-![image-20210121142515262](.\img\image-20210121142515262.png)
+![image-20210121142515262](./img/image-20210121142515262.png)
 
 第二个磁盘不一定存在，没有就跳转到no_disk1标号处。
 
@@ -104,7 +104,7 @@ is_disk1:
 	movw	$0x10, %cx			# we keep only first 16 bytes
 `````
 
-![image-20210121143423743](.\img\image-20210121143423743.png)
+![image-20210121143423743](./img/image-20210121143423743.png)
 
 **微通道架构**或**微通道**总线是[IBM](https://en.wikipedia.org/wiki/IBM)在1987年推出的[专有](https://en.wikipedia.org/wiki/Proprietary_hardware) [16](https://en.wikipedia.org/wiki/16-bit)[位](https://en.wikipedia.org/wiki/32-bit) 或[32位](https://en.wikipedia.org/wiki/32-bit)[并行](https://en.wikipedia.org/wiki/Parallel_communications)计算机[总线](https://en.wikipedia.org/wiki/Bus_(computing))，直到1990年代中期一直用于[PS / 2](https://en.wikipedia.org/wiki/IBM_Personal_System/2)和其他计算机。它的名称通常缩写为“ MCA”，尽管不是IBM。在IBM产品中，它取代了[ISA](https://en.wikipedia.org/wiki/Industry_Standard_Architecture)总线，随后又被[PCI](https://en.wikipedia.org/wiki/Conventional_PCI)总线体系结构取代。
 

@@ -403,7 +403,7 @@ public interface MetaClass extends MetaObjectProtocol {
 
 
 
-![image-20210129143703219](.\img\image-20210129124525966.png)
+![image-20210129143703219](./img/image-20210129124525966.png)
 
 
 
