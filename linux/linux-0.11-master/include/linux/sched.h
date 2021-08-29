@@ -103,6 +103,7 @@ struct task_struct {
 	unsigned long close_on_exec;
 	struct file * filp[NR_OPEN];
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
+	// 本任务的局部表描述符。0-空，1-代码段cs，2-数据和堆栈段ds&ss
 	struct desc_struct ldt[3];
 /* tss for this task */
 	struct tss_struct tss;
@@ -154,7 +155,9 @@ extern void wake_up(struct task_struct ** p);
  */
 #define FIRST_TSS_ENTRY 4
 #define FIRST_LDT_ENTRY (FIRST_TSS_ENTRY+1)
+//，计算在全局表中第n 个任务的TSS 描述符的索引号（选择符）
 #define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))
+//计算在全局表中第n 个任务的LDT 描述符的索引号。
 #define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3))
 #define ltr(n) __asm__("ltr %%ax"::"a" (_TSS(n)))
 #define lldt(n) __asm__("lldt %%ax"::"a" (_LDT(n)))

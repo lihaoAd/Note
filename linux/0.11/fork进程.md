@@ -60,3 +60,45 @@ return -1;
 
 在sched_init执行时调用了set_system_gate(0x80,&system_call);
 
+
+
+```c
+sys_fork:
+	call find_empty_process
+	testl %eax,%eax             # 在eax中返回进程号pid。若返回负数则退出。
+	js 1f
+	push %gs
+	pushl %esi
+	pushl %edi
+	pushl %ebp
+	pushl %eax
+	call copy_process
+	addl $20,%esp               # 丢弃这里所有压栈内容。
+1:	ret
+```
+
+```c
+// 为新进程取得不重复的进程号last_pid.函数返回在任务数组中的任务号(数组项)。
+int find_empty_process(void)
+{
+	int i;
+
+    // 首先获取新的进程号。如果last_pid增1后超出进程号的整数表示范围，则重新从1开始
+    // 使用pid号。然后在任务数组中搜索刚设置的pid号是否已经被任何任务使用。如果是则
+    // 跳转到函数开始出重新获得一个pid号。接着在任务数组中为新任务寻找一个空闲项，并
+    // 返回项号。last_pid是一个全局变量，不用返回。如果此时任务数组中64个项已经被全部
+    // 占用，则返回出错码。
+	repeat:
+		if ((++last_pid)<0) last_pid=1;
+		for(i=0 ; i<NR_TASKS ; i++)
+			if (task[i] && task[i]->pid == last_pid) goto repeat;
+	for(i=1 ; i<NR_TASKS ; i++)         // 任务0项被排除在外
+		if (!task[i])
+			return i;
+	return -EAGAIN;
+}
+
+```
+
+
+

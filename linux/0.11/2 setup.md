@@ -1,10 +1,6 @@
 ## 概述
 
-还记得的setup被加载到什么内存地址了吗？
-
-就是 0x9000:0x0200
-
-
+还记得的setup被加载到什么内存地址了吗？就是 0x9000:0x0200
 
 ## 光标
 
@@ -12,11 +8,11 @@
 
   文本模式下显存物理地址范围为 0xb8000～0xbffff，  在 80 * 25 文本模式下屏幕可显示 2000 个字（字符），4000 字节的内容。显存有 32KB，按理说显存中可以存放 32KB/4000B约等于 8 屏的字符。这就是为什么 Linux 可以用 alt + Fn 键实现 tty 的切换  
 
-<img src="img/image-20210609220902315.png" alt="image-20210609220902315" style="zoom:50%;" />
+<img src="img/image-20210609220902315.png" alt="image-20210609220902315" style="zoom:0%;" />
 
 屏幕上每个字符的低字节是字符的 ASCII 码，高字节是字符属性元信息。在高字节中，低 4 位是字符前景色，高 4 位是字符的背景色。颜色用 RGB 红绿蓝三种基色调和，第 4 位用来控制亮度，若置 1 则呈高亮，若为 0 则为一般正常亮度值。第 7 位用来控制字符是否闪烁（不是背景闪烁）。  
 
-<img src="img/image-20210609221707528.png" alt="image-20210609221707528" style="zoom:50%;" />
+<img src="img/image-20210609221707528.png" alt="image-20210609221707528" style="zoom:0%;" />
 
 [int 10 AH=3](http://www.ctyme.com/intr/rb-0088.htm)
 
@@ -52,13 +48,13 @@ int	0x15
 mov	[2],ax    ! ds:[2]即 0x9000:0x0002这个位置存着扩展内存的大小（kB）
 ```
 
-<img src="img/image-20210609225513729.png" alt="image-20210609225513729" style="zoom:80%;" />
+<img src="img/image-20210609225513729.png" alt="image-20210609225513729" style="zoom:00%;" />
 
 ## 显卡
 
 [显卡的显示模式](http://vitaly_filatov.tripod.com/ng/asm/asm_023.1.html),或者到[这里](http://www.ctyme.com/intr/rb-0069.htm)找资料，
 
-<img src="C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210609231143923.png" alt="image-20210609231143923" style="zoom: 50%;" />
+<img src="img/image-20210609231143923.png" alt="image-20210609231143923" style="zoom: 0%;" />
 
 ```c++
 ! Get video-card data:
@@ -68,7 +64,7 @@ mov	[2],ax    ! ds:[2]即 0x9000:0x0002这个位置存着扩展内存的大小�
 	mov	[6],ax		! al = video mode, ah = window width 
 ```
 
-<img src="img/image-20210609231422147.png" alt="image-20210609231422147" style="zoom:80%;" />
+<img src="img/image-20210609231422147.png" alt="image-20210609231422147" style="zoom:0%;" />
 
 ```c++
 
@@ -83,9 +79,9 @@ mov	[2],ax    ! ds:[2]即 0x9000:0x0002这个位置存着扩展内存的大小�
 	
 ```
 
-<img src="C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210609232149619.png" alt="image-20210609232149619" style="zoom: 50%;" />
+<img src="img/image-20210609232149619.png" alt="image-20210609232149619" style="zoom: 0%;" />
 
-<img src="C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210609232338774.png" alt="image-20210609232338774" style="zoom:80%;" />
+<img src="img/image-20210609232338774.png" alt="image-20210609232338774" style="zoom:0%;" />
 
 
 
@@ -140,13 +136,9 @@ no_disk1:
 
 这里补充一点关于 `movsb、movsw`的知识，因为后面的代码会用到相关知识， 这两个指令通常用于把数据从内存中的一个地方批量地传送（复制）到另一个地方，处理器把它们看成数据串。但是，`movsb`的传送是以字节为单位的，而`movsw`的传送是以字为单位的。 `movsb`和`movsw`指令执行时，原始数据串的段地址由`DS`指定，偏移地址由`SI`指定，简写`DS：SI`；要传送到的目的地址由`ES：DI`指定；传送的字节数（movsb）或者字数（movsw）由`CX`指定。除此之外，还要指定是正向传送还是反向传送，正向传送是指传送操作的方向是从内存区域的低地址端到高地址端；反向传送则正好相反。正向传送时，每传送一个字节（movsb）或者一个字（movsw），`SI`和`DI`加1或者加2；反向传送时，每传送一个字节（movsb）或者一个字（movsw）时，`SI`和`DI`减去1或者减去2。不管是正向传送还是反向传送，也不管每次传送的是字节还是字，每传送一次，`CX`的内容自动减1。 标志寄存器的第10位是方向标志`DF（Direction Flag）`，`DF=0`表示正向传送，`DF=1`表示反向传送。 `cld`指令将DF标志清零，`std`指令将DF标志置1
 
-<img src="img/image-20210610222949529.png" alt="image-20210610222949529" style="zoom: 50%;" />
+<img src="img/image-20210610222949529.png" alt="image-20210610222949529" style="zoom: 0%;" />
 
 图片来源https://stanislavs.org/helppc/int_13-15.html
-
-
-
-
 
 ## 关闭中断
 
@@ -221,11 +213,7 @@ empty_8042:
 
 ![image-20210611234754356](img/image-20210611234754356.png)
 
-
-
-
-
-第一个段描述符默认不用，第二个，段界限（limit）是0x07FF，即limit = 2047，同时G=1，那么这个段的大小就是（2047 +1）* 4096 =8Mb，P=1即这个段指向的内存地址还在内存中，DPL=0表示内核态， S=1表示非系统段，Type = 1010b表示的是以一个代码段，并且是一致性代码段，D/B=1表示地址是32位，段基址是0。
+第一个段描述符默认不用，第二个段界限（limit）是0x07FF，即limit = 2047，同时G=1，那么这个段的大小就是（2047 +1）* 4096 =8Mb，P=1即这个段指向的内存地址还在内存中，DPL=0表示内核态， S=1表示非系统段，Type = 1010b表示的是以一个代码段，并且是一致性代码段，D/B=1表示地址是32位，段基址是0。
 
 第三个段描述符，limit=2047，段大小8Mb，段基址是0，Type=0010表示的是这是一个数据段
 
@@ -262,9 +250,7 @@ gdt_48:
 
 存储中断描述符表的寄存器是IDTR，48位，存储全局描述符表的寄存器是GDTR，48位，这 48 位内存数据划分为两部分，其中前 16 位是 GDT 以字节为单位的界限值，所以这 16 位相当于GDT 的字节大小减 1。后 32 位是 GDT 的起始地址。由于 GDT 的大小是 16 位二进制，其表示的范围是 2的16次方等于65536字节。每个描述符大小是8字节，故， GDT中最多可容纳的描述符数量是65536/8=8192个，即 GDT 中可容纳 8192 个段或门。  
 
-![image-20210610234755785](C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210610234755785.png)
-
-
+![image-20210610234755785](img/image-20210610234755785.png)
 
 无论是中断描述符表还是全局描述符表，里面存的都是段描述符，一个段描述符大小是64字节。
 
@@ -280,7 +266,7 @@ GDT 中的第 0 个段描述符是不可用的，原因是定义在 GDT 中的�
 
 - S 字段，用来指出当前描述符是否是系统段。S 为 0 表示系统段， S 为 1 表示非系统段  ,S字段与Type字段结合起来才能知道这是一个什么段
 
-![image-20210611230401119](C:/Users/LIHAO/Desktop/Slash/linux/0.11/img/image-20210611230401119.png)
+![image-20210611230401119](img/image-20210611230401119.png)
 
 表中的 A 位表示 Accessed 位，这是由 CPU 来设置的，每当该段被 CPU 访问过后， CPU 就将此位置 1。所以，创建一个新段描述符时，应该将此位置 0。  
 
@@ -296,8 +282,6 @@ GDT 中的第 0 个段描述符是不可用的，原因是定义在 GDT 中的�
 ## 8259A
 
 8259A 的作用是负责所有来自外设的中断，其中就包括来自时钟的中断  。
-
-
 
 ```c++
     mov	al,#0x11		! initialization sequence
@@ -343,7 +327,9 @@ jmpi	0,8		! jmp offset 0 of segment 8 (cs)
 
 [图片来源: 英特尔® 64 位和 IA-32 架构开发人员手册：卷 3A](https://www.intel.cn/content/www/cn/zh/architecture-and-technology/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.html)第76页
 
+最后系统的一些参数都在这个内存地址，后面进入main中需要用到这里的地址。
 
+![image-20210828211020150](img/image-20210828211020150.png)
 
 参靠
 

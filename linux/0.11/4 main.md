@@ -1,5 +1,9 @@
 ## 一些参数
 
+还记得在setup中获取的一些系统信息吗
+
+![image-20210828211020150](img/image-20210828211020150.png)
+
 ````c
 #define EXT_MEM_K (*(unsigned short *)0x90002)
 #define DRIVE_INFO (*(struct drive_info *)0x90080)
@@ -75,8 +79,6 @@ root_dev:
 
 计算高端内存15MB的页面数，每个页占据4KB，mem_map数组标记高端内存中页面的使用情况，0表示未使用，向系统申请可以使用，1表示已经被使用。
 
-
-
 ```c++
 // linux0.11内核默认支持的最大内存容量是16MB，可以修改这些定义适合更多的内存。
 // 内存低端(1MB)
@@ -133,4 +135,150 @@ void mem_init(long start_mem, long end_mem)
 		mem_map[i++]=0;         // 标记主内存每个页都未使用
 }
 ```
+
+## 中断向量初始化
+
+kernel/traps.c
+
+```c++
+// 异常(陷阱)中断程序初始化子程序。设置他们的中断调用门(中断向量)。
+// set_trap_gate()与set_system_gate()都使用了中断描述符表IDT中的陷阱门(Trap Gate),
+// 他们之间的主要区别在于前者设置的特权级为0，后者是3.因此断点陷阱中断int3、溢出中断
+// overflow和边界出错中断bounds可以由任何程序产生。
+// 这两个函数均是嵌入式汇编宏程序(include/asm/system.h中)
+void trap_init(void)
+{
+	int i;
+	// 设置除操作出错的中断向量值。
+	set_trap_gate(0,&divide_error);
+	set_trap_gate(1,&debug);
+	set_trap_gate(2,&nmi);
+	set_system_gate(3,&int3);	/* int3-5 can be called from all */
+	set_system_gate(4,&overflow);
+	set_system_gate(5,&bounds);
+	set_trap_gate(6,&invalid_op);
+	set_trap_gate(7,&device_not_available);
+	set_trap_gate(8,&double_fault);
+	set_trap_gate(9,&coprocessor_segment_overrun);
+	set_trap_gate(10,&invalid_TSS);
+	set_trap_gate(11,&segment_not_present);
+	set_trap_gate(12,&stack_segment);
+	set_trap_gate(13,&general_protection);
+	set_trap_gate(14,&page_fault);
+	set_trap_gate(15,&reserved);
+	set_trap_gate(16,&coprocessor_error);
+	// 下面把int17-47的陷阱门先均设置为reserved,以后各硬件初始化时会重新设置自己的陷阱门。
+	for (i=17;i<48;i++)
+		set_trap_gate(i,&reserved);
+	// 设置协处理器中断0x2d(45)陷阱门描述符，并允许其产生中断请求。设置并行口中断描述符。
+	set_trap_gate(45,&irq13);
+	outb_p(inb_p(0x21)&0xfb,0x21);  // 允许8259A主芯片的IRQ2中断请求。
+	outb(inb_p(0xA1)&0xdf,0xA1);    // 允许8259A从芯片的IRQ3中断请求。
+	set_trap_gate(39,&parallel_interrupt); // 设置并行口1的中断0x27陷阱门的描述符。
+    
+}
+```
+
+include/asm/system.h
+
+![image-20210611230401119](img/image-20210611230401119.png)
+
+```java
+// 设置陷阱门函数
+#define set_trap_gate(n,addr) \     
+	_set_gate(&idt[n],15,0,addr)                      // 15表示的是陷阱门，type=1111
+
+// 设置系统调用门函数
+#define set_system_gate(n,addr) \
+	_set_gate(&idt[n],15,3,addr)
+
+
+#define _set_gate(gate_addr,type,dpl,addr) \
+__asm__ ("movw %%dx,%%ax\n\t" \
+	"movw %0,%%dx\n\t" \                               // (short) (0x8000+(dpl<<13)+(type<<8))的值给dx
+	"movl %%eax,%1\n\t" \                              // 把eax中的值给gate_addr这个地址当作内容，此时的eax的高16bit是选择子0x0008，即内核代码段
+ 	"movl %%edx,%2" \                                  // eax 的低16bit是addr低16位的地址，此时edx的值是高16bit是addr的高16位的地址，低16bit是
+	: \                                                // (short) (0x8000+(dpl<<13)+(type<<8))的值
+	: "i" ((short) (0x8000+(dpl<<13)+(type<<8))), \    //  1 dpl(2bit) 0 type(4bit) 0000 0000， 即 P=1 
+	"o" (*((char *) (gate_addr))), \                  
+	"o" (*(4+(char *) (gate_addr))), \
+	"d" ((char *) (addr)),"a" (0x00080000))
+```
+
+![image-20210829002331295](img/image-20210829002331295.png)
+
+![image-20210613094454698](img/image-20210613094454698.png)
+
+![image-20210828230647870](img/image-20210828230647870.png)
+
+![image-20210828231900660](img/image-20210828231900660.png)
+
+## 切换到用户态
+
+```java
+#define move_to_user_mode() \
+__asm__ ("movl %%esp,%%eax\n\t" \
+	"pushl $0x17\n\t" \
+	"pushl %%eax\n\t" \
+	"pushfl\n\t" \
+	"pushl $0x0f\n\t" \
+	"pushl $1f\n\t" \
+	"iret\n" \
+	"1:\tmovl $0x17,%%eax\n\t" \
+	"movw %%ax,%%ds\n\t" \
+	"movw %%ax,%%es\n\t" \
+	"movw %%ax,%%fs\n\t" \
+	"movw %%ax,%%gs" \
+	:::"ax")
+```
+
+## fork进程
+
+```c
+// 下面_syscall0()是unistd.h中的内嵌宏代码。以嵌入汇编的形式调用Linux的系统调用中断
+// 0x80.该中断是所有系统调用的入口。该条语句实际上是int fork()创建进程系统调用。可展
+// 开看之就会立刻明白。syscall0名称中最后的0表示无参数，1表示1个参数。
+static inline _syscall0(int,fork)
+```
+
+```java
+#define _syscall0(type,name) \
+type name(void) \
+{ \
+long __res; \
+__asm__ volatile ("int $0x80" \
+	: "=a" (__res) \
+	: "0" (__NR_##name)); \
+if (__res >= 0) \
+	return (type) __res; \
+errno = -__res; \
+return -1; \
+}
+```
+
+转开后就是
+
+```java
+int fork(void) 
+{ 
+long __res; 
+__asm__ volatile ("int $0x80" \
+	: "=a" (__res) \
+	: "0" (__NR_fork)); \
+if (__res >= 0) \
+	return (int) __res; \
+errno = -__res; \
+return -1; \
+}
+```
+
+``` #define __NR_fork	2```
+
+![image-20210829200900843](img/image-20210829200900843.png)
+
+在 sched.c中 设置了0x80中断门```set_system_gate(0x80,&system_call);```
+
+
+
+
 
