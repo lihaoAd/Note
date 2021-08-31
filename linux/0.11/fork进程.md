@@ -1,5 +1,3 @@
-
-
 ## 定义
 
 fork函数先从当前任务表（task）里找到一个任务号（进程pid），如果可以找到，就会复制当前进程`current`结构体的数据(task_struct),然后复制进程页表项，将RW置位0，为以后写时复制做准备。子进程与父进程共享内存。然后处理信号。切换进程后，CPU会自动的加载每个 task_struct中的TSS数据，并且保存前一个进程的CPU状态到TSS中。进程fork后，就等着调度了。注意，子进程在初始化的时候往eax寄存器中存进去了0，eax用于函数返回值。也就是说子进程会返回0，而父进程会返回自己的pid。
@@ -60,8 +58,6 @@ return -1;
 
 在sched_init执行时调用了set_system_gate(0x80,&system_call);
 
-
-
 ```c
 sys_fork:
 	call find_empty_process
@@ -76,6 +72,8 @@ sys_fork:
 	addl $20,%esp               # 丢弃这里所有压栈内容。
 1:	ret
 ```
+
+![image-20210831234036257](img/4169630-288798f9ad58db94.webp)
 
 ```c
 // 为新进程取得不重复的进程号last_pid.函数返回在任务数组中的任务号(数组项)。
@@ -99,6 +97,173 @@ int find_empty_process(void)
 }
 
 ```
+
+```c
+// 复制进程
+// 该函数的参数进入系统调用中断处理过程开始，直到调用本系统调用处理过程
+// 和调用本函数前时逐步压入栈的各寄存器的值。这些在system_call.s程序中
+// 逐步压入栈的值(参数)包括：
+// 1. CPU执行中断指令压入的用户栈地址ss和esp,标志寄存器eflags和返回地址cs和eip;
+// 2. 在刚进入system_call时压入栈的段寄存器ds、es、fs和edx、ecx、ebx；
+// 3. 调用sys_call_table中sys_fork函数时压入栈的返回地址(用参数none表示)；
+// 4. 在调用copy_process()分配任务数组项号。
+int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
+		long ebx,long ecx,long edx,
+		long fs,long es,long ds,
+		long eip,long cs,long eflags,long esp,long ss)
+{
+	struct task_struct *p;
+	int i;
+	struct file *f;
+
+    // 首先为新任务数据结构分配内存。如果内存分配出错，则返回出错码并退出。
+    // 然后将新任务结构指针放入任务数组的nr项中。其中nr为任务号，由前面
+    // find_empty_process()返回。接着把当前进程任务结构内容复制到刚申请到
+    // 的内存页面p开始处。
+	p = (struct task_struct *) get_free_page();
+	if (!p)
+		return -EAGAIN;
+	task[nr] = p;
+	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
+    // 随后对复制来的进程结构内容进行一些修改，作为新进程的任务结构。先将
+    // 进程的状态置为不可中断等待状态，以防止内核调度其执行。然后设置新进程
+    // 的进程号pid和父进程号father，并初始化进程运行时间片值等于其priority值
+    // 接着复位新进程的信号位图、报警定时值、会话(session)领导标志leader、进程
+    // 及其子进程在内核和用户态运行时间统计值，还设置进程开始运行的系统时间start_time.
+	p->state = TASK_UNINTERRUPTIBLE;
+	p->pid = last_pid;              // 新进程号。也由find_empty_process()得到。
+	p->father = current->pid;       // 设置父进程
+	p->counter = p->priority;       // 运行时间片值
+	p->signal = 0;                  // 信号位图置0
+	p->alarm = 0;                   // 报警定时值(滴答数)
+	p->leader = 0;		/* process leadership doesn't inherit */
+	p->utime = p->stime = 0;        // 用户态时间和和心态运行时间
+	p->cutime = p->cstime = 0;      // 子进程用户态和和心态运行时间
+	p->start_time = jiffies;        // 进程开始运行时间(当前时间滴答数)
+    // 再修改任务状态段TSS数据，由于系统给任务结构p分配了1页新内存，所以(PAGE_SIZE+
+    // (long)p)让esp0正好指向该页顶端。ss0:esp0用作程序在内核态执行时的栈。另外，
+    // 每个任务在GDT表中都有两个段描述符，一个是任务的TSS段描述符，另一个是任务的LDT
+    // 表描述符。下面语句就是把GDT中本任务LDT段描述符和选择符保存在本任务的TSS段中。
+    // 当CPU执行切换任务时，会自动从TSS中把LDT段描述符的选择符加载到ldtr寄存器中。
+	p->tss.back_link = 0;
+	p->tss.esp0 = PAGE_SIZE + (long) p;     // 任务内核态栈指针。
+	p->tss.ss0 = 0x10;                      // 内核态栈的段选择符(与内核数据段相同)
+	p->tss.eip = eip;                       // 指令代码指针
+	p->tss.eflags = eflags;                 // 标志寄存器
+	p->tss.eax = 0;                         // 这是当fork()返回时新进程会返回0的原因所在
+	p->tss.ecx = ecx;
+	p->tss.edx = edx;
+	p->tss.ebx = ebx;
+	p->tss.esp = esp;
+	p->tss.ebp = ebp;
+	p->tss.esi = esi;
+	p->tss.edi = edi;
+	p->tss.es = es & 0xffff;                // 段寄存器仅16位有效
+	p->tss.cs = cs & 0xffff;
+	p->tss.ss = ss & 0xffff;
+	p->tss.ds = ds & 0xffff;
+	p->tss.fs = fs & 0xffff;
+	p->tss.gs = gs & 0xffff;
+	p->tss.ldt = _LDT(nr);                  // 任务局部表描述符的选择符(LDT描述符在GDT中)
+	p->tss.trace_bitmap = 0x80000000;       // 高16位有效
+    // 如果当前任务使用了协处理器，就保存其上下文。汇编指令clts用于清除控制寄存器CRO中
+    // 的任务已交换(TS)标志。每当发生任务切换，CPU都会设置该标志。该标志用于管理数学协
+    // 处理器：如果该标志置位，那么每个ESC指令都会被捕获(异常7)。如果协处理器存在标志MP
+    // 也同时置位的话，那么WAIT指令也会捕获。因此，如果任务切换发生在一个ESC指令开始执行
+    // 之后，则协处理器中的内容就可能需要在执行新的ESC指令之前保存起来。捕获处理句柄会
+    // 保存协处理器的内容并复位TS标志。指令fnsave用于把协处理器的所有状态保存到目的操作数
+    // 指定的内存区域中。
+	if (last_task_used_math == current)
+		__asm__("clts ; fnsave %0"::"m" (p->tss.i387));
+    // 接下来复制进程页表。即在线性地址空间中设置新任务代码段和数据段描述符中的基址和限长，
+    // 并复制页表。如果出错(返回值不是0)，则复位任务数组中相应项并释放为该新任务分配的用于
+    // 任务结构的内存页。
+	if (copy_mem(nr,p)) {
+		task[nr] = NULL;
+		free_page((long) p);
+		return -EAGAIN;
+	}
+    // 如果父进程中有文件是打开的，则将对应文件的打开次数增1，因为这里创建的子进程会与父
+    // 进程共享这些打开的文件。将当前进程(父进程)的pwd，root和executable引用次数均增1.
+    // 与上面同样的道理，子进程也引用了这些i节点。
+	for (i=0; i<NR_OPEN;i++)
+		if ((f=p->filp[i]))
+			f->f_count++;
+	if (current->pwd)
+		current->pwd->i_count++;
+	if (current->root)
+		current->root->i_count++;
+	if (current->executable)
+		current->executable->i_count++;
+    // 随后GDT表中设置新任务TSS段和LDT段描述符项。这两个段的限长均被设置成104字节。
+    // set_tss_desc()和set_ldt_desc()在system.h中定义。"gdt+(nr<<1)+FIRST_TSS_ENTRY"是
+    // 任务nr的TSS描述符项在全局表中的地址。因为每个任务占用GDT表中2项，因此上式中
+    // 要包括'(nr<<1)'.程序然后把新进程设置成就绪态。另外在任务切换时，任务寄存器tr由
+    // CPU自动加载。最后返回新进程号。
+	set_tss_desc(gdt+(nr<<1)+FIRST_TSS_ENTRY,&(p->tss));
+	set_ldt_desc(gdt+(nr<<1)+FIRST_LDT_ENTRY,&(p->ldt));
+	p->state = TASK_RUNNING;	/* do this last, just in case */
+	return last_pid;
+}
+```
+
+
+
+```c
+// 在主内存区中取空闲屋里页面。如果已经没有可用物理内存页面，则返回0.
+// 输入：%1(ax=0) - 0; %2(LOW_MEM)内存字节位图管理的其实位置；%3(cx=PAGING_PAGES);
+// %4(edi=mem_map+PAGING_PAGES-1).
+// 输出：返回%0(ax=物理内存页面起始地址)。
+// 上面%4寄存器实际指向mem_map[]内存字节位图的最后一个字节。本函数从位图末端开
+// 始向前扫描所有页面标志（页面总数PAGING_PAGE），若有页面空闲（内存位图字节为
+// 0）则返回页面地址。注意！本函数只是指出在主内存区的一页空闲物理内存页面，但
+// 并没有映射到某个进程的地址空间中去。后面的put_page()函数即用于把指定页面映射
+// 到某个进程地址空间中。当然对于内核使用本函数并不需要再使用put_page()进行映射，
+// 因为内核代码和数据空间（16MB）已经对等地映射到物理地址空间。
+unsigned long get_free_page(void)
+{
+register unsigned long __res asm("ax");
+
+__asm__("std ; repne ; scasb\n\t"   // 置方向位，al(0)与对应每个页面的(di)内容比较
+	"jne 1f\n\t"                    // 如果没有等于0的字节，则跳转结束(返回0).
+	"movb $1,1(%%edi)\n\t"          // 1 => [1+edi],将对应页面内存映像bit位置1.
+	"sall $12,%%ecx\n\t"            // 页面数*4k = 相对页面其实地址
+	"addl %2,%%ecx\n\t"             // 再加上低端内存地址，得页面实际物理起始地址
+	"movl %%ecx,%%edx\n\t"          // 将页面实际其实地址->edx寄存器。
+	"movl $1024,%%ecx\n\t"          // 寄存器ecx置计数值1024
+	"leal 4092(%%edx),%%edi\n\t"    // 将4092+edx的位置->dei（该页面的末端地址）
+	"rep ; stosl\n\t"               // 将edi所指内存清零(反方向，即将该页面清零)
+	"movl %%edx,%%eax\n"            // 将页面起始地址->eax（返回值）
+	"1:"
+	:"=a" (__res)
+	:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
+	"D" (mem_map+PAGING_PAGES-1)
+	);
+return __res;           // 返回空闲物理页面地址(若无空闲页面则返回0).
+}
+```
+
+`cld`指令将DF标志清零，`std`指令将DF标志置1,标志寄存器的第10位是方向标志`DF（Direction Flag）`，`DF=0`表示正向传送(往高地址去)，`DF=1`表示反向传送(往低地址去)。
+
+`scasb`指令是比较`eax`或者`ax`或者`al`中的值与`edi`或者`di`中的值，每比较一次，`edi`或者`di`自动变化，指向上一个或者下一个单元，这里使用`std`就是`edi`减1
+
+`repne`是repeat not equal，不相等就重复执行，`ecx`里保存着循环的次数
+
+`repne scasb` 就是查找`edi`中与`eax`中的值是否相等，如果找到，`ZF`=1则退出指令的执行；如果没找到，已全部找遍则退出
+
+![image-20210901002321784](img/image-20210901002321784.png)
+
+` stosl` 指令相当于将` eax` 中的值保存到` ES:EDI` 指向的地址中，若设置了标志寄存器EFLAGS中的方向位置位(即在` stosl`指令前使用`STD`指令)则EDI自减4，否则(使用`CLD`指令)EDI自增4
+
+
+
+
+
+![image-20210828230647870](img/image-20210828230647870.png)
+
+![image-20210828231900660](img/image-20210828231900660.png)
+
+![image-20210829200900843](img/image-20210829200900843.png)
 
 
 
