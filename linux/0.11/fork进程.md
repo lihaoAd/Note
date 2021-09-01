@@ -380,6 +380,9 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 		panic("copy_page_tables called with wrong alignment");
 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
+    
+    // 一个页目录项管理1024个页表项，一共管理1024 * 4KB = 4MB的内存空间
+    // size 就是需要多少个页目录项
 	size = ((unsigned) (size+0x3fffff)) >> 22;
     // 在得到了源起始目录项指针from_dir和目的起始目录项指针to_dir以及需要复制的
     // 页表个数size后，下面开始对每个页目录项依次申请1页内存来保存对应的页表，并
@@ -412,8 +415,12 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
         // 到目录页表中。
 		for ( ; nr-- > 0 ; from_page_table++,to_page_table++) {
 			this_page = *from_page_table;
+            
+            // 如果当前源页面没有使用，则不用复制
 			if (!(1 & this_page))
 				continue;
+            // 复位页表项中R/W 标志(置0)。(如果U/S 位是0，则R/W 就没有作用。如果U/S 是1，而R/W 是0
+            // 那么运行在用户层的代码就只能读页面。如果U/S 和R/W 都置位，则就有写的权限。
 			this_page &= ~2;
 			*to_page_table = this_page;
             // 如果该页表所指物理页面的地址在1MB以上，则需要设置内存页面映射数
@@ -442,7 +449,13 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
 }
 ```
 
+![image-20210901223242711](img/image-20210901223242711.png)
 
-
-
+- P，Present，意为存在位。若为1 表示该页存在于物理内存中，若为0 表示该表不在物理内存中。操作系统的页式虚拟内存管理便是通过P 位和相应的pagefault 异常来实现的
+- RW，Read/Write，意为读写位。若为1 表示可读可写，若为0 表示可读不可写
+- US，User/Supervisor，意为普通用户/超级用户位。若为1 时，表示处于User 级，任意级别（0、1、2、3）特权的程序都可以访问该页。若为0，表示处于Supervisor 级，特权级别为3 的程序不允许访问该页，该页只允许特权级别为0、1、2 的程序可以访问
+- PWT，Page-level Write-Through，意为页级通写位，也称页级写透位。若为1 表示此项采用通写方式，表示该页不仅是普通内存，还是高速缓存
+- PCD，Page-level Cache Disable，意为页级高速缓存禁止位。若为1 表示该页启用高速缓存，为0 表示禁止将该页缓存。
+- A，Accessed，意为访问位。若为1 表示该页被CPU 访问过啦，所以该位是由CPU 设置的。
+- D，Dirty，意为脏页位。当CPU 对一个页面执行写操作时，就会设置对应页表项的D 位为1。此项仅针对页表项有效，并不会修改页目录项中的D 位
 
