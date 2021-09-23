@@ -1,7 +1,5 @@
 ## **历史**
 
-
-
 - 1994年，NetScape公司设计了SSL协议（Secure Sockets Layer）的1.0版，但是未发布。
 
 - 1995年，NetScape公司发布SSL 2.0版，很快发现有严重漏洞。

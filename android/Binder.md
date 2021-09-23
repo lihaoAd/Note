@@ -1,3 +1,103 @@
+## Binder 驱动
+
+`goldfish/drivers/staging/android/binder.c`
+
+`goldfish/drivers/staging/android/binder.h`
+
+### 基本数据结构
+
+
+
+```c
+// goldfish/drivers/staging/android/binder.c
+
+struct binder_work {
+	struct list_head entry;
+	enum {
+		BINDER_WORK_TRANSACTION = 1,
+		BINDER_WORK_TRANSACTION_COMPLETE,
+		BINDER_WORK_NODE,
+		BINDER_WORK_DEAD_BINDER,
+		BINDER_WORK_DEAD_BINDER_AND_CLEAR,
+		BINDER_WORK_CLEAR_DEATH_NOTIFICATION,
+	} type;
+};
+```
+
+`binder_work`用来描述待处理的工作项，这些工作项有可能属于一个进程，也有会可能属于一个进程中的某一个线程。成员变量`entry`用来将结构体嵌入到一个宿主结构中，成员变量`type`用来描述工作的类型。
+
+```c
+// goldfish/drivers/staging/android/binder.c
+
+struct binder_node {
+	int debug_id;
+	struct binder_work work;
+	union {
+		struct rb_node rb_node;
+		struct hlist_node dead_node;
+	};
+	struct binder_proc *proc;
+	struct hlist_head refs;
+	int internal_strong_refs;
+	int local_weak_refs;
+	int local_strong_refs;
+	void __user *ptr;
+	void __user *cookie;
+	unsigned has_strong_ref : 1;
+	unsigned pending_strong_ref : 1;
+	unsigned has_weak_ref : 1;
+	unsigned pending_weak_ref : 1;
+	unsigned has_async_transaction : 1;
+	unsigned accept_fds : 1;
+	int min_priority : 8;
+	struct list_head async_todo;
+};
+```
+
+`binder_node`用来描述一个Binder实体对象。每一个Service组件在Binder驱动中都有对应的一个实体Binder实体对象，用来描述它在内核中的状态。Binder驱动通过强引用和弱引用计数技术来维护它们的生命周期。
+
+成员变量`proc`指向一个Binder实体对象的宿主进程。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## main_mediaserver
 
 **frameworks/av/media/mediaserver/main_mediaserver.cpp**

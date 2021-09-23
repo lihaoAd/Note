@@ -73,8 +73,6 @@ root_dev:
 	main_memory_start = buffer_memory_end;
 ``````
 
-
-
 ## 物理内存管理初始化
 
 计算高端内存15MB的页面数，每个页占据4KB，mem_map数组标记高端内存中页面的使用情况，0表示未使用，向系统申请可以使用，1表示已经被使用。

@@ -52,8 +52,6 @@ return -1;
 - int 0x80 是系统调用，"a"表示使用eax寄存器，"="表示只写，类似 _res = eax
 - 0～9：此约束只用在 input 部分，但表示可与 output 和 input 中第 n 个操作数用相同的寄存器或内存  ，`"0" (__NR_fork))`表示表示沿用上一次的约束，就是把`__NR_fork`的值2放到`eax`寄存器中。
 
-
-
 ## 0x80中断
 
 在sched_init执行时调用了set_system_gate(0x80,&system_call);
@@ -120,6 +118,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
     // 然后将新任务结构指针放入任务数组的nr项中。其中nr为任务号，由前面
     // find_empty_process()返回。接着把当前进程任务结构内容复制到刚申请到
     // 的内存页面p开始处。
+    // 返回的是真实的物理地址
 	p = (struct task_struct *) get_free_page();
 	if (!p)
 		return -EAGAIN;
@@ -205,6 +204,16 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->state = TASK_RUNNING;	/* do this last, just in case */
 	return last_pid;
 }
+```
+
+
+
+```c
+#define TASK_RUNNING		 0
+#define TASK_INTERRUPTIBLE	 1
+#define TASK_UNINTERRUPTIBLE 2
+#define TASK_ZOMBIE		     3
+#define TASK_STOPPED		 4
 ```
 
 
