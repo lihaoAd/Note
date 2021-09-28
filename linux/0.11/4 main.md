@@ -276,7 +276,8 @@ return -1; \
 
 在 sched.c中 设置了0x80中断门```set_system_gate(0x80,&system_call);```
 
+![image-20210928235234923](img/image-20210928235234923.png)
 
 
 
-
+![image-20210928235324713](img/image-20210928235324713.png)
