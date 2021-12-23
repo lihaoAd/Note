@@ -1,4 +1,4 @@
-## 源码位置
+## c源码位置
 
 ```java
 frameworks/base/libs/binder/ProcessState.cpp
@@ -1362,4 +1362,178 @@ void binder_loop(struct binder_state *bs, binder_handler func)
 ```
 
 
+
+### svcmgr_handler
+
+```c++
+int svcmgr_handler(struct binder_state *bs,
+                   struct binder_txn *txn,
+                   struct binder_io *msg,
+                   struct binder_io *reply)
+{
+    struct svcinfo *si;
+    uint16_t *s;
+    unsigned len;
+    void *ptr;
+    uint32_t strict_policy;
+
+//    LOGI("target=%p code=%d pid=%d uid=%d\n",
+//         txn->target, txn->code, txn->sender_pid, txn->sender_euid);
+
+    // svcmgr_handle就是前面的BINDER_SERVICE_MANAGER， 为NULL
+    // 比较是不是自己
+    if (txn->target != svcmgr_handle)
+        return -1;
+
+    // Equivalent to Parcel::enforceInterface(), reading the RPC
+    // header with the strict mode policy mask and the interface name.
+    // Note that we ignore the strict_policy and don't propagate it
+    // further (since we do no outbound RPCs anyway).
+    strict_policy = bio_get_uint32(msg);
+    s = bio_get_string16(msg, &len);
+    if ((len != (sizeof(svcmgr_id) / 2)) ||
+        memcmp(svcmgr_id, s, sizeof(svcmgr_id))) {
+        fprintf(stderr,"invalid id %s\n", str8(s));
+        return -1;
+    }
+
+    switch(txn->code) {
+    case SVC_MGR_GET_SERVICE:
+    case SVC_MGR_CHECK_SERVICE:
+         // s就是servcie的名称
+        s = bio_get_string16(msg, &len);
+        ptr = do_find_service(bs, s, len);
+        if (!ptr)
+            break;
+        bio_put_ref(reply, ptr);
+        return 0;
+
+    case SVC_MGR_ADD_SERVICE:
+        // 对应addService
+        s = bio_get_string16(msg, &len);
+        ptr = bio_get_ref(msg);
+        if (do_add_service(bs, s, len, ptr, txn->sender_euid))
+            return -1;
+        break;
+
+    case SVC_MGR_LIST_SERVICES: {
+        // 获取所有注册的service
+        unsigned n = bio_get_uint32(msg);
+
+        si = svclist;
+        while ((n-- > 0) && si)
+            si = si->next;
+        if (si) {
+            bio_put_string16(reply, si->name);
+            return 0;
+        }
+        return -1;
+    }
+    default:
+        LOGE("unknown code %d\n", txn->code);
+        return -1;
+    }
+
+    bio_put_uint32(reply, 0);
+    return 0;
+}
+```
+
+
+
+### do_add_service
+
+```c++
+int do_add_service(struct binder_state *bs, uint16_t *s, unsigned len, void *ptr, unsigned uid)
+{
+    struct svcinfo *si;
+//    LOGI("add_service('%s',%p) uid=%d\n", str8(s), ptr, uid);
+
+    if (!ptr || (len == 0) || (len > 127))
+        return -1;
+
+    // 不是什么service都可以注册的
+    if (!svc_can_register(uid, s)) {
+        LOGE("add_service('%s',%p) uid=%d - PERMISSION DENIED\n",
+             str8(s), ptr, uid);
+        return -1;
+    }
+
+    // 找到对应的servcie
+    si = find_svc(s, len);
+    if (si) {
+        if (si->ptr) {
+            LOGE("add_service('%s',%p) uid=%d - ALREADY REGISTERED\n",
+                 str8(s), ptr, uid);
+            return -1;
+        }
+        si->ptr = ptr;
+    } else {
+        si = malloc(sizeof(*si) + (len + 1) * sizeof(uint16_t));
+        if (!si) {
+            LOGE("add_service('%s',%p) uid=%d - OUT OF MEMORY\n",
+                 str8(s), ptr, uid);
+            return -1;
+        }
+        si->ptr = ptr;
+        si->len = len;
+        memcpy(si->name, s, (len + 1) * sizeof(uint16_t));
+        si->name[len] = '\0';
+        si->death.func = svcinfo_death;
+        si->death.ptr = si;
+        si->next = svclist;
+        svclist = si;
+    }
+
+    binder_acquire(bs, ptr);
+    // 服务进程退出时，ServiceManager会收到来自binder设备的通知
+    binder_link_to_death(bs, ptr, &si->death);
+    return 0;
+}
+```
+
+```c++
+int svc_can_register(unsigned uid, uint16_t *name)
+{
+    unsigned n;
+    
+    // 如果用户组是root用户或system用户，才能注册
+    if ((uid == 0) || (uid == AID_SYSTEM))
+        return 1;
+
+    for (n = 0; n < sizeof(allowed) / sizeof(allowed[0]); n++)
+        if ((uid == allowed[n].uid) && str16eq(name, allowed[n].name))
+            return 1;
+
+    return 0;
+}
+```
+
+就算不是root用户组或者system用户，如果allowed中有也是可以的
+
+```c++
+static struct {
+    unsigned uid;
+    const char *name;
+} allowed[] = {
+#ifdef LVMX
+    { AID_MEDIA, "com.lifevibes.mx.ipc" },
+#endif
+    { AID_MEDIA, "media.audio_flinger" },
+    { AID_MEDIA, "media.player" },
+    { AID_MEDIA, "media.camera" },
+    { AID_MEDIA, "media.audio_policy" },
+    { AID_NFC,   "nfc" },
+    { AID_RADIO, "radio.phone" },
+    { AID_RADIO, "radio.sms" },
+    { AID_RADIO, "radio.phonesubinfo" },
+    { AID_RADIO, "radio.simphonebook" },
+/* TODO: remove after phone services are updated: */
+    { AID_RADIO, "phone" },
+    { AID_RADIO, "sip" },
+    { AID_RADIO, "isms" },
+    { AID_RADIO, "iphonesubinfo" },
+    { AID_RADIO, "simphonebook" },
+};
+```
 

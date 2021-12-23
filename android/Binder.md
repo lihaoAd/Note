@@ -56,9 +56,53 @@ struct binder_node {
 
 `binder_node`用来描述一个Binder实体对象。每一个Service组件在Binder驱动中都有对应的一个实体Binder实体对象，用来描述它在内核中的状态。Binder驱动通过强引用和弱引用计数技术来维护它们的生命周期。
 
-成员变量`proc`指向一个Binder实体对象的宿主进程。
+- `proc`指向一个Binder实体对象的宿主进程。
+
+```c
+struct binder_proc {
+	struct hlist_node proc_node;
+	struct rb_root threads;
+	struct rb_root nodes;
+	struct rb_root refs_by_desc;
+	struct rb_root refs_by_node;
+	int pid;
+	struct vm_area_struct *vma;
+	struct task_struct *tsk;
+	struct files_struct *files;
+	struct hlist_node deferred_work_node;
+	int deferred_work;
+	void *buffer;
+	ptrdiff_t user_buffer_offset;
+
+	struct list_head buffers;
+	struct rb_root free_buffers;
+	struct rb_root allocated_buffers;
+	size_t free_async_space;
+
+	struct page **pages;
+	size_t buffer_size;
+	uint32_t buffer_free;
+	struct list_head todo;
+	wait_queue_head_t wait;
+	struct binder_stats stats;
+	struct list_head delivered_death;
+	int max_threads;
+	int requested_threads;
+	int requested_threads_started;
+	int ready_threads;
+	long default_priority;
+};
+```
 
 
+
+- internal_strong_refs、local_strong_refs
+
+  用来描述以一个Binder实体对象的强引用计数，
+
+- local_weak_refs
+
+  用来描述以一个Binder实体对象的弱引用计数，
 
 
 
