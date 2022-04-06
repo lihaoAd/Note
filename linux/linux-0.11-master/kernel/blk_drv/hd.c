@@ -187,7 +187,12 @@ static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 		panic("Trying to write bad sector");
 	if (!controller_ready())
 		panic("HD controller not ready");
-	do_hd = intr_addr;
+	// do_hd在对应的驱动中声明，比如在
+	// blk.h中
+	// #define DEVICE_INTR do_hd
+	// void (*DEVICE_INTR)(void) = NULL;
+	
+	do_hd = intr_addr;  // do_hd 函数指针将在硬盘中断程序中被调用
 	outb_p(hd_info[drive].ctl,HD_CMD);
 	port=HD_DATA;
 	outb_p(hd_info[drive].wpcom>>2,++port);

@@ -1,0 +1,2 @@
+想要通过ServiceManager获取其他服务之前，服务需要把自己注册到ServiceManager中。
+

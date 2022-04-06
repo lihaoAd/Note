@@ -8,7 +8,7 @@ https://storage.googleapis.com/git-repo-downloads/repo
 
 下载完成后，把  **REPO_URL = 'https://gerrit.googlesource.com/git-repo'** 修改为**REPO_URL = 'https://gerrit-googlesource.proxy.ustclug.org/git-repo'**
 
-![image-20210818231325628](/img/image-20210818231325628.png)
+![image-20210818231325628](img/image-20210818231325628.png)
 
 ## init
 
