@@ -734,7 +734,348 @@ status_t IPCThreadState::transact(int32_t handle,
 
 
 
+frameworks\base\libs\binder\IPCThreadState.cpp
 
+```c++
+status_t IPCThreadState::writeTransactionData(int32_t cmd, uint32_t binderFlags,
+    int32_t handle, uint32_t code, const Parcel& data, status_t* statusBuffer)
+{
+    binder_transaction_data tr;
+
+    tr.target.handle = handle;
+    tr.code = code;
+    tr.flags = binderFlags;
+    
+    const status_t err = data.errorCheck();
+    if (err == NO_ERROR) {
+        tr.data_size = data.ipcDataSize();
+        tr.data.ptr.buffer = data.ipcData();
+        tr.offsets_size = data.ipcObjectsCount()*sizeof(size_t);
+        tr.data.ptr.offsets = data.ipcObjects();
+    } else if (statusBuffer) {
+        tr.flags |= TF_STATUS_CODE;
+        *statusBuffer = err;
+        tr.data_size = sizeof(status_t);
+        tr.data.ptr.buffer = statusBuffer;
+        tr.offsets_size = 0;
+        tr.data.ptr.offsets = NULL;
+    } else {
+        return (mLastError = err);
+    }
+    
+    mOut.writeInt32(cmd);
+    mOut.write(&tr, sizeof(tr));
+    
+    return NO_ERROR;
+}
+```
+
+![image-20220407222849377](./img/image-20220407222849377.png)
+
+至此`mOut`里面就有一个`BC_TRANSACTION`命令协议。
+
+
+
+frameworks\base\include\binder\IPCThreadState.h
+
+参数`doReceive`有个默认值true
+
+```c++
+ status_t            talkWithDriver(bool doReceive=true);
+```
+
+
+
+frameworks\base\libs\binder\IPCThreadState.cpp
+
+```c++
+status_t IPCThreadState::talkWithDriver(bool doReceive)
+{
+    LOG_ASSERT(mProcess->mDriverFD >= 0, "Binder driver is not opened");
+    
+    binder_write_read bwr;
+    
+    // Is the read buffer empty?
+    // 进程已经处理完上次Binder驱动发送的返回协议，那么needRead就是true
+    const bool needRead = mIn.dataPosition() >= mIn.dataSize();
+    
+    // We don't want to write anything if we are still reading
+    // from data left in the input buffer and the caller
+    // has requested to read the next data.
+    const size_t outAvail = (!doReceive || needRead) ? mOut.dataSize() : 0;
+    
+    bwr.write_size = outAvail;
+    // 缓冲区的地址
+    bwr.write_buffer = (long unsigned int)mOut.data();
+
+    // This is what we'll read.
+    if (doReceive && needRead) {
+        bwr.read_size = mIn.dataCapacity();
+        bwr.read_buffer = (long unsigned int)mIn.data();
+    } else {
+        bwr.read_size = 0;
+    }
+    
+  .....
+    
+    // Return immediately if there is nothing to do.
+    if ((bwr.write_size == 0) && (bwr.read_size == 0)) return NO_ERROR;
+    
+    bwr.write_consumed = 0;
+    bwr.read_consumed = 0;
+    status_t err;
+    do {
+       ...
+#if defined(HAVE_ANDROID_OS)
+        if (ioctl(mProcess->mDriverFD, BINDER_WRITE_READ, &bwr) >= 0)
+            err = NO_ERROR;
+        else
+            err = -errno;
+#else
+        err = INVALID_OPERATION;
+#endif
+        ...
+    } while (err == -EINTR);
+    
+    ...
+
+    if (err >= NO_ERROR) {
+        if (bwr.write_consumed > 0) {
+            if (bwr.write_consumed < (ssize_t)mOut.dataSize())
+                mOut.remove(0, bwr.write_consumed);
+            else
+                mOut.setDataSize(0);
+        }
+        if (bwr.read_consumed > 0) {
+            mIn.setDataSize(bwr.read_consumed);
+            mIn.setDataPosition(0);
+        }
+        ...
+        return NO_ERROR;
+    }
+    
+    return err;
+}
+```
+
+`talkWithDriver`使用IO命令`BINDER_WRITE_READ`来与Binder驱动交互，它需要定义一个`binder_write_read`结构体来指定输入缓冲区和输出缓冲区。
+
+
+
+
+
+drivers\staging\android\binder.c
+
+```c
+// cmd:就是上面传进来的 BINDER_WRITE_READ
+// arg:就是&bwr地址
+static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	int ret;
+	struct binder_proc *proc = filp->private_data;
+	struct binder_thread *thread;
+	unsigned int size = _IOC_SIZE(cmd);
+	void __user *ubuf = (void __user *)arg;
+
+	ret = wait_event_interruptible(binder_user_error_wait, binder_stop_on_user_error < 2);
+	if (ret)
+		return ret;
+
+	mutex_lock(&binder_lock);
+	thread = binder_get_thread(proc);
+	if (thread == NULL) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	switch (cmd) {
+	case BINDER_WRITE_READ: {
+		
+        struct binder_write_read bwr;
+        
+		if (size != sizeof(struct binder_write_read)) {
+			ret = -EINVAL;
+			goto err;
+		}
+        // 把在用户空间的ubuf数据赋值到&bwr
+		if (copy_from_user(&bwr, ubuf, sizeof(bwr))) {
+			ret = -EFAULT;
+			goto err;
+		}
+		...
+            
+		if (bwr.write_size > 0) {
+            
+            // 我们知道，上面的给bwr设置的write_size是大于0的
+			ret = binder_thread_write(proc, thread, (void __user *)bwr.write_buffer, bwr.write_size, &bwr.write_consumed);
+			if (ret < 0) {
+				bwr.read_consumed = 0;
+				if (copy_to_user(ubuf, &bwr, sizeof(bwr)))
+					ret = -EFAULT;
+				goto err;
+			}
+		}
+		if (bwr.read_size > 0) {
+			ret = binder_thread_read(proc, thread, (void __user *)bwr.read_buffer, bwr.read_size, &bwr.read_consumed, filp->f_flags & O_NONBLOCK);
+			if (!list_empty(&proc->todo))
+				wake_up_interruptible(&proc->wait);
+			if (ret < 0) {
+				if (copy_to_user(ubuf, &bwr, sizeof(bwr)))
+					ret = -EFAULT;
+				goto err;
+			}
+		}
+		if (binder_debug_mask & BINDER_DEBUG_READ_WRITE)
+			printk(KERN_INFO "binder: %d:%d wrote %ld of %ld, read return %ld of %ld\n",
+			       proc->pid, thread->pid, bwr.write_consumed, bwr.write_size, bwr.read_consumed, bwr.read_size);
+		if (copy_to_user(ubuf, &bwr, sizeof(bwr))) {
+			ret = -EFAULT;
+			goto err;
+		}
+		break;
+	}
+            
+	.....
+        
+	}
+	ret = 0;
+err:
+	if (thread)
+		thread->looper &= ~BINDER_LOOPER_STATE_NEED_RETURN;
+	mutex_unlock(&binder_lock);
+	wait_event_interruptible(binder_user_error_wait, binder_stop_on_user_error < 2);
+	if (ret && ret != -ERESTARTSYS)
+		printk(KERN_INFO "binder: %d:%d ioctl %x %lx returned %d\n", proc->pid, current->pid, cmd, arg, ret);
+	return ret;
+}
+```
+
+
+
+drivers\staging\android\binder.c
+
+```c
+int
+binder_thread_write(struct binder_proc *proc, struct binder_thread *thread,
+		    void __user *buffer, int size, signed long *consumed)
+{
+	uint32_t cmd;
+    // 驱动需要读取缓冲区的起始于结束地址
+	void __user *ptr = buffer + *consumed;
+	void __user *end = buffer + size;
+
+	while (ptr < end && thread->return_error == BR_OK) {
+		if (get_user(cmd, (uint32_t __user *)ptr))
+			return -EFAULT;
+        // 读取到cmd后，指针移动sizeof(uint32_t)大小，为了读取后面的
+		ptr += sizeof(uint32_t);
+		...
+		switch (cmd) {
+		...
+
+		case BC_TRANSACTION:
+		case BC_REPLY: {
+			struct binder_transaction_data tr;
+
+			if (copy_from_user(&tr, ptr, sizeof(tr)))
+				return -EFAULT;
+			ptr += sizeof(tr);
+			binder_transaction(proc, thread, &tr, cmd == BC_REPLY);
+			break;
+		}
+
+		...
+		}
+		*consumed = ptr - buffer;
+	}
+	return 0;
+}
+```
+
+![image-20220407235928330](./img/image-20220407235928330.png)
+
+
+
+`binder_transaction`函数有点长，分段分析,`reply`用来描述处理的是`BC_TRANSACTION`还是`BC_REPLY`协议,这里我们研究`BC_TRANSACTION`
+
+drivers\staging\android\binder.c
+
+```c
+// reply：用来描述处理的是BC_TRANSACTION还是BC_REPLY协议
+static void
+binder_transaction(struct binder_proc *proc, struct binder_thread *thread,struct binder_transaction_data *tr, int reply)
+{
+	struct binder_transaction *t;
+	struct binder_work *tcomplete;
+	size_t *offp, *off_end;
+	struct binder_proc *target_proc;
+	struct binder_thread *target_thread = NULL;
+	struct binder_node *target_node = NULL;
+	struct list_head *target_list;
+	wait_queue_head_t *target_wait;
+	struct binder_transaction *in_reply_to = NULL;
+	struct binder_transaction_log_entry *e;
+	uint32_t return_error;
+
+	e = binder_transaction_log_add(&binder_transaction_log);
+	e->call_type = reply ? 2 : !!(tr->flags & TF_ONE_WAY);
+	e->from_proc = proc->pid;
+	e->from_thread = thread->pid;
+	e->target_handle = tr->target.handle;
+	e->data_size = tr->data_size;
+	e->offsets_size = tr->offsets_size;
+    
+    if (reply) {
+        ....
+    }else {
+        
+        // 我们想把wifiService注册到ServiceManager中，那么target.handle就是0,即tr->target.handle就是false
+		if (tr->target.handle) {
+          ...
+		} else {
+            // 拿到ServiceManager在binder驱动中的binder实体对象
+			target_node = binder_context_mgr_node;
+			if (target_node == NULL) {
+				return_error = BR_DEAD_REPLY;
+				goto err_no_context_mgr_node;
+			}
+		}
+        
+		...
+        // 拿到binder实体对象就可以拿到对应进程的binder_proc    
+		target_proc = target_node->proc;
+        
+		if (target_proc == NULL) {
+			return_error = BR_DEAD_REPLY;
+			goto err_dead_binder;
+		}
+        
+        // TF_ONE_WAY位为1，就表示需要异步传输，不需要等待回复数据
+		if (!(tr->flags & TF_ONE_WAY) && thread->transaction_stack) {
+			struct binder_transaction *tmp;
+			tmp = thread->transaction_stack;
+			if (tmp->to_thread != thread) {
+				....
+				return_error = BR_FAILED_REPLY;
+				goto err_bad_call_stack;
+			}
+			while (tmp) {
+				if (tmp->from && tmp->from->proc == target_proc)
+					target_thread = tmp->from;
+				tmp = tmp->from_parent;
+			}
+		}
+	}
+    
+	if (target_thread) {
+		e->to_thread = target_thread->pid;
+		target_list = &target_thread->todo;
+		target_wait = &target_thread->wait;
+	} else {
+		target_list = &target_proc->todo;
+		target_wait = &target_proc->wait;
+	}
+```
 
 
 
