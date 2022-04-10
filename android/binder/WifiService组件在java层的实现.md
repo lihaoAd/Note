@@ -59,6 +59,35 @@ public interface IWifiManager extends android.os.IInterface{
 
 
 
+frameworks\base\core\java\android\os\Binder.java
+
+```java
+public class Binder implements IBinder {
+
+    private int mObject;
+    private IInterface mOwner;
+    private String mDescriptor;  // android.net.wifi.IWifiManager
+    
+    public Binder() {
+        // 会在JNI层构造JavaBBinderHolder对象
+        init();
+        ...
+    }
+    
+	public void attachInterface(IInterface owner, String descriptor) {
+        mOwner = owner;
+        mDescriptor = descriptor;
+    }
+    
+    private native final void init();
+    
+    ....
+	
+}
+```
+
+
+
 ## WifiService 启动
 
 Wifiservice的启动地方在system server中
@@ -158,6 +187,7 @@ private ConnectivityService(Context context) {
                 
                 WifiStateTracker wst = new WifiStateTracker(context, mHandler);
                 WifiService wifiService = new WifiService(context, wst);
+                // wifi
                 ServiceManager.addService(Context.WIFI_SERVICE, wifiService);
                 wifiService.startWifi();
                 mNetTrackers[ConnectivityManager.TYPE_WIFI] = wst;
@@ -169,30 +199,14 @@ private ConnectivityService(Context context) {
 }
 ```
 
-
-
-`WifiService`是`Binder`的子类,构造函数中有个`init`方法
-
-```java
-public class Binder implements IBinder{
-
-	public Binder() {
-        init();
-
-       ...
-    }
-    
-     private native final void init();
-}
-```
-
-这个`init`就对应`JNI`层的`android_os_Binder_init`
+`WifiService`是`Binder`的子类,构造函数中有个`init`方法,这个`init`就对应`JNI`层的`android_os_Binder_init`
 
 frameworks\base\core\jni\android_util_Binder.cpp
 
 ```c++
 static void android_os_Binder_init(JNIEnv* env, jobject clazz)
 {
+    // clazz就是WifiService对象
     JavaBBinderHolder* jbh = new JavaBBinderHolder(env, clazz);
     if (jbh == NULL) {
         jniThrowException(env, "java/lang/OutOfMemoryError", NULL);
@@ -265,6 +279,8 @@ frameworks\base\core\jni\android_util_Binder.cpp
 class JavaBBinder : public BBinder
 {
 public:
+    
+    // object:wifiService
     JavaBBinder(JNIEnv* env, jobject object)  : mVM(jnienv_to_javavm(env)), mObject(env->NewGlobalRef(object))
     {
         LOGV("Creating JavaBBinder %p\n", this);
@@ -285,7 +301,6 @@ public:
 protected:
     virtual ~JavaBBinder()
     {
-        LOGV("Destroying JavaBBinder %p\n", this);
         android_atomic_dec(&gNumLocalRefs);
         JNIEnv* env = javavm_to_jnienv(mVM);
         env->DeleteGlobalRef(mObject);
@@ -295,15 +310,11 @@ protected:
     {
         JNIEnv* env = javavm_to_jnienv(mVM);
 
-        LOGV("onTransact() on %p calling object %p in env %p vm %p\n", this, mObject, env, mVM);
-
         IPCThreadState* thread_state = IPCThreadState::self();
         const int strict_policy_before = thread_state->getStrictModePolicy();
         thread_state->setLastTransactionBinderFlags(flags);
 
-        //printf("Transact from %p to Java code sending: ", this);
-        //data.print();
-        //printf("\n");
+      
         jboolean res = env->CallBooleanMethod(mObject, gBinderOffsets.mExecTransact,
             code, (int32_t)&data, (int32_t)reply, flags);
         jthrowable excep = env->ExceptionOccurred();
@@ -351,6 +362,8 @@ private:
 
 ## 注册WifiService
 
+### getIServiceManager
+
 frameworks\base\services\java\com\android\server\ConnectivityService.java
 
 ```java
@@ -363,6 +376,8 @@ frameworks\base\core\java\android\os\ServiceManager.java
 ```java
 public static void addService(String name, IBinder service) {
      try {
+         // name是wifi
+         // servcie就是 wifiService对象
          getIServiceManager().addService(name, service);
        } catch (RemoteException e) {
            Log.e(TAG, "error in addService", e);
@@ -385,6 +400,12 @@ private static IServiceManager getIServiceManager() {
 
 ![](./img/ServiceManager的java代理对象的获取过程.jpg)
 
+
+
+### ServiceManagerProxy
+
+
+
 frameworks\base\core\java\android\os\ServiceManagerNative.java
 
 ```java
@@ -393,8 +414,11 @@ class ServiceManagerProxy implements IServiceManager {
 	public void addService(String name, IBinder service) throws RemoteException {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
+        // android.os.IServiceManager
         data.writeInterfaceToken(IServiceManager.descriptor);
+        // wifi
         data.writeString(name);
+        // wifiService
         data.writeStrongBinder(service);
         // 这个mRemote就是BinderProxy
         mRemote.transact(ADD_SERVICE_TRANSACTION, data, reply, 0);
@@ -441,6 +465,8 @@ static void android_os_Parcel_writeStrongBinder(JNIEnv* env, jobject clazz, jobj
 
 `ibinderForJavaObject(env, object)`返回的是一个C++层的`JavaBBinderHolder`对象
 
+### ibinderForJavaObject
+
 
 
 ```c++
@@ -454,7 +480,7 @@ sp<IBinder> ibinderForJavaObject(JNIEnv* env, jobject obj)
         // wifiServices是 android.os.Binder的子类
         // 从wifiServices获取mObject，即c++层中的JavaBBinderHolder对象
         JavaBBinderHolder* jbh = (JavaBBinderHolder*) env->GetIntField(obj, gBinderOffsets.mObject);
-        //  get方法就可以获得JavaBBinder对象
+        //  get方法就可以获得C++层的JavaBBinder对象
         return jbh != NULL ? jbh->get(env) : NULL;
     }
 
@@ -468,6 +494,8 @@ sp<IBinder> ibinderForJavaObject(JNIEnv* env, jobject obj)
     return NULL;
 }
 ```
+
+### Parcel#writeStrongBinder
 
 
 
@@ -533,7 +561,7 @@ status_t flatten_binder(const sp<ProcessState>& proc, const sp<IBinder>& binder,
 
 先构造一个`flat_binder_object`，然后往`Parcel`中写
 
-
+![image-20220409154413525](./img/image-20220409154413525.png)
 
 
 
@@ -545,6 +573,8 @@ BBinder* BBinder::localBinder()
     return this;
 }
 ```
+
+### BinderProxy#transact
 
 现在数据已经写入到缓冲区中，接下来分析
 
@@ -610,15 +640,11 @@ static jboolean android_os_BinderProxy_transact(JNIEnv* env, jobject obj,
 
    
     // 获取java层的BinderProxy对象中mObject，即拿到c++层的BpBinder对象
-    IBinder* target = (IBinder*)
-        env->GetIntField(obj, gBinderProxyOffsets.mObject);
+    IBinder* target = (IBinder*) env->GetIntField(obj, gBinderProxyOffsets.mObject);
     if (target == NULL) {
         jniThrowException(env, "java/lang/IllegalStateException", "Binder has been finalized!");
         return JNI_FALSE;
     }
-
-    LOGV("Java code calling transact on %p in Java object %p with code %d\n",
-            target, obj, code);
 
     // Only log the binder call duration for things on the Java-level main thread.
     // But if we don't
@@ -628,7 +654,6 @@ static jboolean android_os_BinderProxy_transact(JNIEnv* env, jobject obj,
     if (time_binder_calls) {
         start_millis = uptimeMillis();
     }
-    //printf("Transact from Java code to %p sending: ", target); data->print();
     
     // 调用BpBinder的transact方法
     status_t err = target->transact(code, *data, reply, flags);
@@ -668,6 +693,8 @@ status_t BpBinder::transact(uint32_t code, const Parcel& data, Parcel* reply, ui
 
 实际上是调用了`IPCThreadState`的`transact`方法
 
+### IPCThreadState#transact
+
 
 
 frameworks\base\libs\binder\IPCThreadState.cpp
@@ -685,8 +712,6 @@ status_t IPCThreadState::transact(int32_t handle,
     ...
     
     if (err == NO_ERROR) {
-        LOG_ONEWAY(">>>> SEND from pid %d uid %d %s", getpid(), getuid(),
-            (flags & TF_ONE_WAY) == 0 ? "READ REPLY" : "ONE WAY");
         err = writeTransactionData(BC_TRANSACTION, flags, handle, code, data, NULL);
     }
     
@@ -770,9 +795,11 @@ status_t IPCThreadState::writeTransactionData(int32_t cmd, uint32_t binderFlags,
 }
 ```
 
-![image-20220407222849377](./img/image-20220407222849377.png)
+![image-20220409155126154](./img/image-20220409155126154.png)
 
 至此`mOut`里面就有一个`BC_TRANSACTION`命令协议。
+
+### IPCThreadState#talkWithDriver
 
 
 
@@ -791,7 +818,6 @@ frameworks\base\libs\binder\IPCThreadState.cpp
 ```c++
 status_t IPCThreadState::talkWithDriver(bool doReceive)
 {
-    LOG_ASSERT(mProcess->mDriverFD >= 0, "Binder driver is not opened");
     
     binder_write_read bwr;
     
@@ -859,10 +885,6 @@ status_t IPCThreadState::talkWithDriver(bool doReceive)
 ```
 
 `talkWithDriver`使用IO命令`BINDER_WRITE_READ`来与Binder驱动交互，它需要定义一个`binder_write_read`结构体来指定输入缓冲区和输出缓冲区。
-
-
-
-
 
 drivers\staging\android\binder.c
 
@@ -992,9 +1014,7 @@ binder_thread_write(struct binder_proc *proc, struct binder_thread *thread,
 }
 ```
 
-![image-20220407235928330](./img/image-20220407235928330.png)
-
-
+![image-20220409214329931](./img/image-20220409214329931.png)
 
 `binder_transaction`函数有点长，分段分析,`reply`用来描述处理的是`BC_TRANSACTION`还是`BC_REPLY`协议,这里我们研究`BC_TRANSACTION`
 
@@ -1017,13 +1037,7 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,struct
 	struct binder_transaction_log_entry *e;
 	uint32_t return_error;
 
-	e = binder_transaction_log_add(&binder_transaction_log);
-	e->call_type = reply ? 2 : !!(tr->flags & TF_ONE_WAY);
-	e->from_proc = proc->pid;
-	e->from_thread = thread->pid;
-	e->target_handle = tr->target.handle;
-	e->data_size = tr->data_size;
-	e->offsets_size = tr->offsets_size;
+	...
     
     if (reply) {
         ....
@@ -1042,7 +1056,7 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,struct
 		}
         
 		...
-        // 拿到binder实体对象就可以拿到对应进程的binder_proc    
+        // 拿到binder实体对象就可以拿到对应进程的binder_proc,即ServiceManager进程的binder_proc
 		target_proc = target_node->proc;
         
 		if (target_proc == NULL) {
@@ -1051,14 +1065,13 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,struct
 		}
         
         // TF_ONE_WAY位为1，就表示需要异步传输，不需要等待回复数据
+        // transaction_stack不为null表示该线程正在等待其他线程的返回
+        // thread是wifiService进程的线程
+        // 这里实在找该thread依赖的事务有没有serviceManager binder线程
 		if (!(tr->flags & TF_ONE_WAY) && thread->transaction_stack) {
 			struct binder_transaction *tmp;
 			tmp = thread->transaction_stack;
-			if (tmp->to_thread != thread) {
-				....
-				return_error = BR_FAILED_REPLY;
-				goto err_bad_call_stack;
-			}
+			...
 			while (tmp) {
 				if (tmp->from && tmp->from->proc == target_proc)
 					target_thread = tmp->from;
@@ -1068,16 +1081,513 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,struct
 	}
     
 	if (target_thread) {
-		e->to_thread = target_thread->pid;
+		...
 		target_list = &target_thread->todo;
 		target_wait = &target_thread->wait;
 	} else {
 		target_list = &target_proc->todo;
 		target_wait = &target_proc->wait;
 	}
+    ....
 ```
 
 
 
+
+
+drivers\staging\android\binder.c
+
+```c++
+	....
+       
+
+	/* TODO: reuse incoming transaction for reply */
+	t = kzalloc(sizeof(*t), GFP_KERNEL);
+	if (t == NULL) {
+		return_error = BR_FAILED_REPLY;
+		goto err_alloc_t_failed;
+	}
+	...
+
+	tcomplete = kzalloc(sizeof(*tcomplete), GFP_KERNEL);
+	if (tcomplete == NULL) {
+		return_error = BR_FAILED_REPLY;
+		goto err_alloc_tcomplete_failed;
+	}
+	...
+
+	t->debug_id = ++binder_last_id;
+	...
+
+    // reply：用来描述处理的是BC_TRANSACTION还是BC_REPLY协议
+    // 我们现在正在处理BC_TRANSACTION，即reply值为0，!reply 就是true
+	if (!reply && !(tr->flags & TF_ONE_WAY))
+        // 处理BC_TRANSACTION的同步请求
+        // 把客户段的线程放在from中，以便目标线程或者进程处理完请求后，通知源线程
+		t->from = thread;
+	else
+		t->from = NULL;
+
+	t->sender_euid = proc->tsk->cred->euid;
+	t->to_proc = target_proc;
+	t->to_thread = target_thread;
+	t->code = tr->code;                // ADD_SERVICE_TRANSACTION
+	t->flags = tr->flags;              // TF_ACCEPT_FDS
+	t->priority = task_nice(current);
+
+	// 为binder_transaction分配一个内核缓冲区，以便可以将进程间通信数据拷贝到它里面
+	t->buffer = binder_alloc_buf(target_proc, tr->data_size,
+		tr->offsets_size, !reply && (t->flags & TF_ONE_WAY));
+
+	if (t->buffer == NULL) {
+		return_error = BR_FAILED_REPLY;
+		goto err_binder_alloc_buf_failed;
+	}
+	t->buffer->allow_user_free = 0;
+	t->buffer->debug_id = t->debug_id;
+	t->buffer->transaction = t;
+	t->buffer->target_node = target_node;
+	if (target_node)
+		binder_inc_node(target_node, 1, 0, NULL);
+
+   // 用来保存偏移数组的起始位置
+	offp = (size_t *)(t->buffer->data + ALIGN(tr->data_size, sizeof(void *)));
+
+   
+	if (copy_from_user(t->buffer->data, tr->data.ptr.buffer, tr->data_size)) {
+		binder_user_error("binder: %d:%d got transaction with invalid "
+			"data ptr\n", proc->pid, thread->pid);
+		return_error = BR_FAILED_REPLY;
+		goto err_copy_data_failed;
+	}
+ 	
+	if (copy_from_user(offp, tr->data.ptr.offsets, tr->offsets_size)) {
+		binder_user_error("binder: %d:%d got transaction with invalid "
+			"offsets ptr\n", proc->pid, thread->pid);
+		return_error = BR_FAILED_REPLY;
+		goto err_copy_data_failed;
+	}
+	if (!IS_ALIGNED(tr->offsets_size, sizeof(size_t))) {
+		binder_user_error("binder: %d:%d got transaction with "
+			"invalid offsets size, %zd\n",
+			proc->pid, thread->pid, tr->offsets_size);
+		return_error = BR_FAILED_REPLY;
+		goto err_bad_offset;
+	}
+	off_end = (void *)offp + tr->offsets_size;
+```
+
+drivers\staging\android\binder.c
+
+```c++
+	for (; offp < off_end; offp++) {
+		struct flat_binder_object *fp;
+		if (*offp > t->buffer->data_size - sizeof(*fp) ||
+		    t->buffer->data_size < sizeof(*fp) ||
+		    !IS_ALIGNED(*offp, sizeof(void *))) {
+			binder_user_error("binder: %d:%d got transaction with "
+				"invalid offset, %zd\n",
+				proc->pid, thread->pid, *offp);
+			return_error = BR_FAILED_REPLY;
+			goto err_bad_offset;
+		}
+		fp = (struct flat_binder_object *)(t->buffer->data + *offp);
+		switch (fp->type) {
+		case BINDER_TYPE_BINDER:
+		case BINDER_TYPE_WEAK_BINDER: {
+			struct binder_ref *ref;
+			struct binder_node *node = binder_get_node(proc, fp->binder);
+			if (node == NULL) {
+				node = binder_new_node(proc, fp->binder, fp->cookie);
+				if (node == NULL) {
+					return_error = BR_FAILED_REPLY;
+					goto err_binder_new_node_failed;
+				}
+				node->min_priority = fp->flags & FLAT_BINDER_FLAG_PRIORITY_MASK;
+				node->accept_fds = !!(fp->flags & FLAT_BINDER_FLAG_ACCEPTS_FDS);
+			}
+			if (fp->cookie != node->cookie) {
+				binder_user_error("binder: %d:%d sending u%p "
+					"node %d, cookie mismatch %p != %p\n",
+					proc->pid, thread->pid,
+					fp->binder, node->debug_id,
+					fp->cookie, node->cookie);
+				goto err_binder_get_ref_for_node_failed;
+			}
+			ref = binder_get_ref_for_node(target_proc, node);
+			if (ref == NULL) {
+				return_error = BR_FAILED_REPLY;
+				goto err_binder_get_ref_for_node_failed;
+			}
+			if (fp->type == BINDER_TYPE_BINDER)
+				fp->type = BINDER_TYPE_HANDLE;
+			else
+				fp->type = BINDER_TYPE_WEAK_HANDLE;
+			fp->handle = ref->desc;
+			binder_inc_ref(ref, fp->type == BINDER_TYPE_HANDLE, &thread->todo);
+			if (binder_debug_mask & BINDER_DEBUG_TRANSACTION)
+				printk(KERN_INFO "        node %d u%p -> ref %d desc %d\n",
+				       node->debug_id, node->ptr, ref->debug_id, ref->desc);
+		} break;
+		......
+	}
+```
+
+
+
+drivers\staging\android\binder.c
+
+```c++
+	if (reply) {
+		...
+	} else if (!(t->flags & TF_ONE_WAY)) {
+		BUG_ON(t->buffer->async_transaction != 0);
+		t->need_reply = 1;
+		t->from_parent = thread->transaction_stack;
+		thread->transaction_stack = t;
+	} else {
+		BUG_ON(target_node == NULL);
+		BUG_ON(t->buffer->async_transaction != 1);
+		if (target_node->has_async_transaction) {
+			target_list = &target_node->async_todo;
+			target_wait = NULL;
+		} else
+			target_node->has_async_transaction = 1;
+	}
+	t->work.type = BINDER_WORK_TRANSACTION;
+	list_add_tail(&t->work.entry, target_list);
+	tcomplete->type = BINDER_WORK_TRANSACTION_COMPLETE;
+	list_add_tail(&tcomplete->entry, &thread->todo);
+	if (target_wait)
+		wake_up_interruptible(target_wait);
+	return;
+
+....
+```
+
+
+
+
+
+
+
+`ServiceManager`主线程启动并注册binder线程后，就等待client端发送数据
+
+
+
+frameworks\base\cmds\servicemanager\binder.c
+
+```c++
+void binder_loop(struct binder_state *bs, binder_handler func)
+{
+    int res;
+    struct binder_write_read bwr;
+    unsigned readbuf[32];
+
+    bwr.write_size = 0;
+    bwr.write_consumed = 0;
+    bwr.write_buffer = 0;
+    
+    readbuf[0] = BC_ENTER_LOOPER;
+    binder_write(bs, readbuf, sizeof(unsigned));
+
+    for (;;) {
+        bwr.read_size = sizeof(readbuf);
+        bwr.read_consumed = 0;
+        bwr.read_buffer = (unsigned) readbuf;
+
+        res = ioctl(bs->fd, BINDER_WRITE_READ, &bwr);
+
+        if (res < 0) {
+            LOGE("binder_loop: ioctl failed (%s)\n", strerror(errno));
+            break;
+        }
+
+        // 数据发送过来
+        res = binder_parse(bs, 0, readbuf, bwr.read_consumed, func);
+        if (res == 0) {
+            LOGE("binder_loop: unexpected reply?!\n");
+            break;
+        }
+        if (res < 0) {
+            LOGE("binder_loop: io error %d %s\n", res, strerror(errno));
+            break;
+        }
+    }
+}
+```
+
+
+
+
+
 ## 获取WifiService服务代理
+
+一般都是这么获取系统的服务
+
+```java
+WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+
+```
+
+frameworks\base\core\java\android\app\ContextImpl.java
+
+```java
+@Override
+    public Object getSystemService(String name) {
+        ...
+        } else if (WIFI_SERVICE.equals(name)) {
+            return getWifiManager();
+        } 
+           ....
+```
+
+
+
+frameworks\base\core\java\android\app\ContextImpl.java
+
+```java
+private WifiManager getWifiManager()
+{
+    synchronized (sSync) {
+        if (sWifiManager == null) {
+            IBinder b = ServiceManager.getService(WIFI_SERVICE);
+            IWifiManager service = IWifiManager.Stub.asInterface(b);
+            sWifiManager = new WifiManager(service, mMainThread.getHandler());
+        }
+    }
+    return sWifiManager;
+}
+```
+
+
+
+frameworks\base\core\java\android\os\ServiceManager.java
+
+```java
+    public static IBinder getService(String name) {
+        try {
+            IBinder service = sCache.get(name);
+            if (service != null) {
+                return service;
+            } else {
+                // ServiceManagerProxy
+                return getIServiceManager().getService(name);
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "error in getService", e);
+        }
+        return null;
+    }
+```
+
+`getIServiceManager()`获取到的是一个`ServiceManagerProxy`
+
+
+
+frameworks\base\core\java\android\os\ServiceManagerNative.java
+
+```java
+
+class ServiceManagerProxy implements IServiceManager {
+    public ServiceManagerProxy(IBinder remote) {
+        mRemote = remote;
+    }
+    
+    public IBinder asBinder() {
+        return mRemote;
+    }
+    
+    
+    public IBinder getService(String name) throws RemoteException {
+        // name:wifi
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        // android.os.IServiceManager
+        data.writeInterfaceToken(IServiceManager.descriptor);
+        data.writeString(name);
+        //mRemote就是BinderProxy
+        mRemote.transact(GET_SERVICE_TRANSACTION, data, reply, 0);
+        IBinder binder = reply.readStrongBinder();
+        reply.recycle();
+        data.recycle();
+        return binder;
+    }
+    
+ .....   
+}
+
+```
+
+
+
+frameworks\base\core\java\android\os\Binder.java
+
+```java
+final class BinderProxy implements IBinder {
+
+ 	public native boolean transact(int code, Parcel data, Parcel reply, int flags) throws RemoteException;
+            
+    ....
+            
+ }
+```
+
+
+
+frameworks\base\core\jni\android_util_Binder.cpp
+
+````c++
+
+// obj:BinderProxy对象
+// code:GET_SERVICE_TRANSACTION
+// dataObj:Parcel
+// replyObj:Parcel
+// flags:0
+static jboolean android_os_BinderProxy_transact(JNIEnv* env, jobject obj,
+                                                jint code, jobject dataObj,
+                                                jobject replyObj, jint flags)
+    
+{
+    if (dataObj == NULL) {
+        jniThrowException(env, "java/lang/NullPointerException", NULL);
+        return JNI_FALSE;
+    }
+
+    // 获取c++层的Parcel对象
+    Parcel* data = parcelForJavaObject(env, dataObj);
+    if (data == NULL) {
+        return JNI_FALSE;
+    }
+     // 获取c++层的Parcel对象
+    Parcel* reply = parcelForJavaObject(env, replyObj);
+    if (reply == NULL && replyObj != NULL) {
+        return JNI_FALSE;
+    }
+
+    // BpBinder对象
+    IBinder* target = (IBinder*) env->GetIntField(obj, gBinderProxyOffsets.mObject);
+    if (target == NULL) {
+        jniThrowException(env, "java/lang/IllegalStateException", "Binder has been finalized!");
+        return JNI_FALSE;
+    }
+
+   ...
+   
+    // 调用BpBinder的transact
+    status_t err = target->transact(code, *data, reply, flags);
+    //if (reply) printf("Transact from Java code to %p received: ", target); reply->print();
+    if (time_binder_calls) {
+        conditionally_log_binder_call(start_millis, target, code);
+    }
+
+    if (err == NO_ERROR) {
+        return JNI_TRUE;
+    } else if (err == UNKNOWN_TRANSACTION) {
+        return JNI_FALSE;
+    }
+
+    signalExceptionForError(env, obj, err);
+    return JNI_FALSE;
+}
+````
+
+
+
+frameworks\base\libs\binder\BpBinder.cpp
+
+```c++
+// code:GET_SERVICE_TRANSACTION
+// data:Parcel
+// reply:Parcel
+// flags:0
+status_t BpBinder::transact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
+{
+    // Once a binder has died, it will never come back to life.
+    if (mAlive) {
+        // mHandle:0
+        status_t status = IPCThreadState::self()->transact(mHandle, code, data, reply, flags);
+        if (status == DEAD_OBJECT) mAlive = 0;
+        return status;
+    }
+
+    return DEAD_OBJECT;
+}
+```
+
+
+
+frameworks\base\libs\binder\IPCThreadState.cpp
+
+```c++
+status_t IPCThreadState::transact(int32_t handle,
+                                  uint32_t code, const Parcel& data,
+                                  Parcel* reply, uint32_t flags)
+{
+    status_t err = data.errorCheck();
+
+    flags |= TF_ACCEPT_FDS;
+
+    ...
+    
+    if (err == NO_ERROR) {
+        LOG_ONEWAY(">>>> SEND from pid %d uid %d %s", getpid(), getuid(),
+            (flags & TF_ONE_WAY) == 0 ? "READ REPLY" : "ONE WAY");
+        err = writeTransactionData(BC_TRANSACTION, flags, handle, code, data, NULL);
+    }
+    
+    if (err != NO_ERROR) {
+        if (reply) reply->setError(err);
+        return (mLastError = err);
+    }
+    
+    if ((flags & TF_ONE_WAY) == 0) {
+        #if 0
+        if (code == 4) { // relayout
+            LOGI(">>>>>> CALLING transaction 4");
+        } else {
+            LOGI(">>>>>> CALLING transaction %d", code);
+        }
+        #endif
+        if (reply) {
+            err = waitForResponse(reply);
+        } else {
+            Parcel fakeReply;
+            err = waitForResponse(&fakeReply);
+        }
+        #if 0
+        if (code == 4) { // relayout
+            LOGI("<<<<<< RETURNING transaction 4");
+        } else {
+            LOGI("<<<<<< RETURNING transaction %d", code);
+        }
+        #endif
+        
+        IF_LOG_TRANSACTIONS() {
+            TextOutput::Bundle _b(alog);
+            alog << "BR_REPLY thr " << (void*)pthread_self() << " / hand "
+                << handle << ": ";
+            if (reply) alog << indent << *reply << dedent << endl;
+            else alog << "(none requested)" << endl;
+        }
+    } else {
+        err = waitForResponse(NULL, NULL);
+    }
+    
+    return err;
+}
+```
+
+![image-20220409212204494](./img/image-20220409212204494.png)
+
+struct binder_write_read {
+	signed long	write_size;	/* bytes to write */
+	signed long	write_consumed;	/* bytes consumed by driver */
+	unsigned long	write_buffer;
+	signed long	read_size;	/* bytes to read */
+	signed long	read_consumed;	/* bytes consumed by driver */
+	unsigned long	read_buffer;
+};
+
+
 

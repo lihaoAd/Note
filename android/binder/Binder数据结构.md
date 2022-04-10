@@ -208,6 +208,44 @@ struct binder_proc {
 
 `binder_proc`结构体是 `open("/dev/binder")`设备时会为该进程创建。在驱动中表示打开binder设备的宿主进程。
 
+## binder_thread
+
+
+
+drivers/staging/android/binder.c
+
+```c
+struct binder_thread {
+	struct binder_proc *proc;
+	struct rb_node rb_node;
+	int pid;
+	int looper;
+	struct binder_transaction *transaction_stack;   // 如果transaction_stack不为NULL，说明该binder线程在等待其他线程完成另一个事务
+	struct list_head todo;   // 如果todo队列不为NULL，说明该线程有未处理的工作
+	uint32_t return_error; /* Write failed, return error code in read buf */
+	uint32_t return_error2; /* Write failed, return error code in read */
+		/* buffer. Used when sending a reply to a dead process that */
+		/* we are also waiting on */
+	wait_queue_head_t wait;
+	struct binder_stats stats;
+};
+```
+
+binder线程的状态`looper`取值如下
+
+drivers/staging/android/binder.c
+
+```c++
+enum {
+	BINDER_LOOPER_STATE_REGISTERED  = 0x01,
+	BINDER_LOOPER_STATE_ENTERED     = 0x02,
+	BINDER_LOOPER_STATE_EXITED      = 0x04,
+	BINDER_LOOPER_STATE_INVALID     = 0x08,
+	BINDER_LOOPER_STATE_WAITING     = 0x10,
+	BINDER_LOOPER_STATE_NEED_RETURN = 0x20
+};
+```
+
 
 
 
@@ -309,24 +347,32 @@ drivers/staging/android/binder.c
 struct binder_transaction {
 	int debug_id;
 	struct binder_work work;
-	struct binder_thread *from;
-	struct binder_transaction *from_parent;
-	struct binder_proc *to_proc;
-	struct binder_thread *to_thread;
-	struct binder_transaction *to_parent;
-	unsigned need_reply : 1;
+	struct binder_thread *from;    // 指向发起事务的线程，称为源线程
+	struct binder_transaction *from_parent; // 该事务需要依赖的另一个事务
+	struct binder_proc *to_proc;        
+	struct binder_thread *to_thread;  // 指向处理事务的线程，称为目标线程
+	struct binder_transaction *to_parent;  // 目标线程下一个需要处理的事务
+	unsigned need_reply : 1;   // 用来区分一个事务是同步的还是异步的
 	/*unsigned is_dead : 1;*/ /* not used at the moment */
 
 	struct binder_buffer *buffer;
 	unsigned int	code;
 	unsigned int	flags;
-	long	priority;
+	long	priority;             // 源线程的优先级
 	long	saved_priority;
-	uid_t	sender_euid;
+	uid_t	sender_euid;         // 源线程的euid，主要给目标线程或者目标进程看的，用于识别发起方的身份
 };
 ```
 
+假设线程A发起一个事务T1，需要由线程B来处理，线程B在处理事务T1时，又需要线程C先处理事务T2，线程C在处理事务T2时，又需要线程A先处理事务T3，这样，T1就依赖T2，T2依赖T3，T3依赖T1。
 
+那么
+
+```
+T2->from_parent = T1
+T3->from_parent = T2
+T3->to_parent = T1
+```
 
 ## binder_write_read
 
@@ -378,7 +424,7 @@ drivers/staging/android/binder.h
 struct flat_binder_object {
 	/* 8 bytes for large_flat_header. */
 	unsigned long		type;
-	unsigned long		flags;
+	unsigned long		flags; // BINDER_TYPE_BINDER、BINDER_TYPE_WEAK_BINDER才有意义
 
 	/* 8 bytes of data. */
 	union {
@@ -388,6 +434,32 @@ struct flat_binder_object {
 
 	/* extra data associated with local object */
 	void			*cookie;
+};
+```
+
+`flat_binder_object`用来描述一个Binder实体对象和一个Binder引用对象外，还可以用来描述一个文件描述符。
+
+`type`的取值范围如下
+
+```c
+#define B_PACK_CHARS(c1, c2, c3, c4) \
+	((((c1)<<24)) | (((c2)<<16)) | (((c3)<<8)) | (c4))
+#define B_TYPE_LARGE 0x85
+
+enum {
+   
+    // 描述一个强类型的Binder实体对象
+	BINDER_TYPE_BINDER	= B_PACK_CHARS('s', 'b', '*', B_TYPE_LARGE),
+    // 描述一个弱类型的Binder实体对象
+	BINDER_TYPE_WEAK_BINDER	= B_PACK_CHARS('w', 'b', '*', B_TYPE_LARGE),
+    
+    // 描述一个强类型的Binder引用对象
+	BINDER_TYPE_HANDLE	= B_PACK_CHARS('s', 'h', '*', B_TYPE_LARGE),
+    // 描述一个弱类型的Binder引用对象
+	BINDER_TYPE_WEAK_HANDLE	= B_PACK_CHARS('w', 'h', '*', B_TYPE_LARGE),
+    
+    // 描述一个文件描述符
+	BINDER_TYPE_FD		= B_PACK_CHARS('f', 'd', '*', B_TYPE_LARGE),
 };
 ```
 

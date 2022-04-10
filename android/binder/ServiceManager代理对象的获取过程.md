@@ -17,6 +17,8 @@ frameworks\base\libs\binder\IServiceManager.cpp
 
 `client`获取Service Manager的代理对象可以使用`defaultServiceManager()`方法
 
+frameworks\base\libs\binder\IServiceManager.cpp 
+
 ```c
 sp<IServiceManager> defaultServiceManager()
 {
@@ -31,6 +33,10 @@ sp<IServiceManager> defaultServiceManager()
     return gDefaultServiceManager;
 }
 ```
+
+
+
+frameworks\base\libs\binder\ProcessState.cpp
 
 ```c
 sp<ProcessState> ProcessState::self()
@@ -73,6 +79,8 @@ int main(int argc, char **argv)
 不是的，如果是异步的话是这个值的一半，具体我们到分析binder驱动时再讲
 
 
+
+frameworks\base\libs\binder\ProcessState.cpp
 
 ```c
 #define BINDER_VM_SIZE ((1*1024*1024) - (4096 *2))  // 1M - 8K
@@ -178,7 +186,7 @@ bool ProcessState::supportsProcesses() const
 
 ```c
 struct handle_entry {
-      IBinder* binder; // Binder代理对象
+      IBinder* binder; // Binder代理对象，即BpBinder
       RefBase::weakref_type* refs; // 内部的一个弱引用计数对象
   };
 ```
@@ -239,17 +247,6 @@ frameworks\base\include\binder\ProcessState.h
 Vector<handle_entry>mHandleToObject;
 ```
 
-frameworks\base\include\binder\ProcessState.h
-
-```c++
-struct handle_entry {
-    IBinder* binder;
-    RefBase::weakref_type* refs;
-};
-```
-
-
-
 
 
 ```c
@@ -269,7 +266,7 @@ ProcessState::handle_entry* ProcessState::lookupHandleLocked(int32_t handle)
 
 进程的binder代理对象都保存在`ProcessState`类的成员变量`mHandleToObject`中
 
-![image-20220405005124736](./img/image-20220405005124736.png)
+![image-20220409113459503](./img/image-20220409113459503.png)
 
 
 
