@@ -30,36 +30,17 @@ device_initcall(binder_init);
 
 ## binder_open
 
-drivers/staging/android/binder.c
-
 先初始化 `binder_procs`, `HLIST_HEAD`是一个宏
+
+drivers/staging/android/binder.c
 
 ```c
 static HLIST_HEAD(binder_procs);
 ```
 
-````c
-#define LIST_HEAD(name) \
-	struct list_head name = LIST_HEAD_INIT(name)
-````
-
-展开就是
-
-```c
-struct list_head binder_procs = LIST_HEAD_INIT(name)
-```
-
-再展开就是
-
-```c
-struct list_head binder_procs = {&binder_procs,&binder_procs}
-```
-
-
-
 include\linux\list.h
 
-```c
+````c
 struct hlist_head {
 	struct hlist_node *first;
 };
@@ -79,17 +60,30 @@ static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)
 	h->first = n;
 	n->pprev = &h->first; // 指向前一个next
 }
+
+````
+
+展开就是
+
+```c
+static struct hlist_head binder_procs = {  .first = NULL }
 ```
+
+
+
+![image-20220418013916158](./img/image-20220418013916158.png)
+
+
+
+![image-20220418013941492](./img/image-20220418013941492.png)
+
+
 
 
 
 drivers\staging\android\binder.c
 
 ```c
-// 初始化一个全局的binder_procs
-static HLIST_HEAD(binder_procs);
-//等价于 
-// struct hlist_head binder_procs = {  .first = NULL }
 
 ....
     

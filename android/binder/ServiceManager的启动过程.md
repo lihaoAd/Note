@@ -72,6 +72,7 @@ struct binder_state *binder_open(unsigned mapsize)
 {
     struct binder_state *bs;
 
+    // 分配binder_state内存空间，bs就是指向该内存空间的地址
     bs = malloc(sizeof(*bs));
     if (!bs) {
         errno = ENOMEM;
@@ -102,7 +103,83 @@ fail_open:
 }
 ```
 
-## binder_become_context_manager
+
+
+drivers\staging\android\binder.c
+
+```c
+static int binder_open(struct inode *nodp, struct file *filp)
+{
+    // 此时初始化的时候还是null
+	struct binder_proc *proc;
+
+	if (binder_debug_mask & BINDER_DEBUG_OPEN_CLOSE)
+		printk(KERN_INFO "binder_open: %d:%d\n", current->group_leader->pid, current->pid);
+
+    // 分配binder_proc内存空间，proc就是指向该空间的地址
+	proc = kzalloc(sizeof(*proc), GFP_KERNEL);
+	if (proc == NULL)
+		return -ENOMEM;
+    
+    // #define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)
+    // get_task_struct是一个宏定义 include\linux\sched.h
+    // 增加current的引用
+	get_task_struct(current);
+    
+    // 将当前线程的task保存到binder的tsk
+	proc->tsk = current;
+	/*
+		static inline void INIT_LIST_HEAD(struct list_head *list)
+		{
+			list->next = list;
+			list->prev = list;
+		}
+	*/
+	// include\linux\list.h
+    
+    // 初始化todo队列，还是一个空的
+	INIT_LIST_HEAD(&proc->todo);
+    
+    // 初始化等待队列，也是空的
+	init_waitqueue_head(&proc->wait);
+    
+	proc->default_priority = task_nice(current);
+	
+	mutex_lock(&binder_lock);
+	binder_stats.obj_created[BINDER_STAT_PROC]++;
+	/*
+	struct hlist_head {
+		struct hlist_node *first;
+	};
+
+	struct hlist_node {
+		struct hlist_node *next, **pprev;
+	};
+	*/
+    
+    // 将proc->proc_node添加到binder_procs列表上
+	hlist_add_head(&proc->proc_node, &binder_procs);
+    
+	proc->pid = current->group_leader->pid;
+	INIT_LIST_HEAD(&proc->delivered_death);
+	filp->private_data = proc;
+	mutex_unlock(&binder_lock);
+
+    // 创建pid目录
+	if (binder_proc_dir_entry_proc) {
+		char strbuf[11];
+		snprintf(strbuf, sizeof(strbuf), "%u", proc->pid);
+		remove_proc_entry(strbuf, binder_proc_dir_entry_proc);
+		create_proc_read_entry(strbuf, S_IRUGO, binder_proc_dir_entry_proc, binder_read_proc_proc, proc);
+	}
+
+	return 0;
+}
+```
+
+`binder_open`函数还是比较简单的，主要是创建了`binder_proc`,并且追加到`binder_procs`列表上。
+
+
 
 frameworks\base\cmds\servicemanager\binder.c
 
@@ -131,8 +208,13 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	int ret;
     // 在打开binder设备时会创建binder_proc
 	struct binder_proc *proc = filp->private_data;
+    // 
 	struct binder_thread *thread;
+    
+    // 计算参数的大小
 	unsigned int size = _IOC_SIZE(cmd);
+    
+    // 用户空间的参数
 	void __user *ubuf = (void __user *)arg;
 
 
@@ -144,6 +226,8 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     thread = binder_get_thread(proc);
     ...
 	case BINDER_SET_CONTEXT_MGR:
+    
+    	// 不可以重复设置 BINDER_SET_CONTEXT_MGR
 		if (binder_context_mgr_node != NULL) {
 			printk(KERN_ERR "binder: BINDER_SET_CONTEXT_MGR already set\n");
 			ret = -EBUSY;
@@ -191,8 +275,6 @@ err:
 	return ret;
 }
 ```
-
-
 
 ## binder_get_thread
 
@@ -310,10 +392,6 @@ static struct binder_node * binder_new_node(struct binder_proc *proc, void __use
 
 ## binder_loop
 
-
-
-
-
 frameworks/base/cmds/servicemanager/binder.c
 
 ```c
@@ -323,21 +401,27 @@ void binder_loop(struct binder_state *bs, binder_handler func)
     // BINDER_WRITE_READ 协议的数据 需要binder_write_read
     struct binder_write_read bwr;
     
-    // 用来包含协议
+    // 用来包含协议 32字节
     unsigned readbuf[32];
 
+    // 没有数据发送给binder驱动，后面会被改写
     bwr.write_size = 0;
     bwr.write_consumed = 0;
     bwr.write_buffer = 0;
     
+    // 写入ioctl命令
     readbuf[0] = BC_ENTER_LOOPER;
+    // 向binder驱动写入数据，使用 BINDER_WRITE_READ 协议
     binder_write(bs, readbuf, sizeof(unsigned));
 
+    // binder驱动处理BC_ENTER_LOOPER后，返回用户空间
     for (;;) {
+        // 这下binder驱动可以向用户空间写数据了，数据放在readbuf
         bwr.read_size = sizeof(readbuf);
         bwr.read_consumed = 0;
         bwr.read_buffer = (unsigned) readbuf;
 
+        // 继续调用BINDER_WRITE_READ
         res = ioctl(bs->fd, BINDER_WRITE_READ, &bwr);
 
         if (res < 0) {
@@ -521,4 +605,269 @@ int binder_thread_write(struct binder_proc *proc, struct binder_thread *thread, 
 ```
 
 ![](./img/ServiceManager启动时序图.jpg)
+
+
+
+
+
+## binder_parse
+
+frameworks\base\cmds\servicemanager\binder.c
+
+```c
+int binder_parse(struct binder_state *bs, struct binder_io *bio, uint32_t *ptr, uint32_t size, binder_handler func)
+{
+    int r = 1;
+	// ptr是uint32_t类型的指针，ptr加1表示地址增加4个字节，所以size/4表示该空间可以划分为4字节的数量
+    uint32_t *end = ptr + (size / 4);
+
+    while (ptr < end) {
+		// 一个cmd占据uint32_t
+        uint32_t cmd = *ptr++;
+#if TRACE
+        fprintf(stderr,"%s:\n", cmd_name(cmd));
+#endif
+        switch(cmd) {
+        case BR_NOOP:
+            break;
+        case BR_TRANSACTION_COMPLETE:
+            break;
+        case BR_INCREFS:
+        case BR_ACQUIRE:
+        case BR_RELEASE:
+        case BR_DECREFS:
+#if TRACE
+            fprintf(stderr,"  %08x %08x\n", ptr[0], ptr[1]);
+#endif
+            ptr += 2;
+            break;
+        case BR_TRANSACTION: {
+            struct binder_txn *txn = (void *) ptr;
+            if ((end - ptr) * sizeof(uint32_t) < sizeof(struct binder_txn)) {
+                LOGE("parse: txn too small!\n");
+                return -1;
+            }
+			// 追踪调试
+            binder_dump_txn(txn);
+            if (func) {
+                unsigned rdata[256/4];
+                struct binder_io msg;
+                struct binder_io reply;
+                int res;
+
+                bio_init(&reply, rdata, sizeof(rdata), 4);
+                bio_init_from_txn(&msg, txn);
+                res = func(bs, txn, &msg, &reply);
+                binder_send_reply(bs, &reply, txn->data, res);
+            }
+			// 跳过这个命令占用的空间
+            ptr += sizeof(*txn) / sizeof(uint32_t);
+            break;
+        }
+        case BR_REPLY: {
+            struct binder_txn *txn = (void*) ptr;
+            if ((end - ptr) * sizeof(uint32_t) < sizeof(struct binder_txn)) {
+                LOGE("parse: reply too small!\n");
+                return -1;
+            }
+            binder_dump_txn(txn);
+            if (bio) {
+                bio_init_from_txn(bio, txn);
+                bio = 0;
+            } else {
+                    /* todo FREE BUFFER */
+            }
+            ptr += (sizeof(*txn) / sizeof(uint32_t));
+            r = 0;
+            break;
+        }
+        case BR_DEAD_BINDER: {
+            struct binder_death *death = (void*) *ptr++;
+            death->func(bs, death->ptr);
+            break;
+        }
+        case BR_FAILED_REPLY:
+            r = -1;
+            break;
+        case BR_DEAD_REPLY:
+            r = -1;
+            break;
+        default:
+            LOGE("parse: OOPS %d\n", cmd);
+            return -1;
+        }
+    }
+
+    return r;
+}
+```
+
+
+
+frameworks\base\cmds\servicemanager\binder.c
+
+```c
+void bio_init_from_txn(struct binder_io *bio, struct binder_txn *txn)
+{
+    bio->data = bio->data0 = txn->data;
+    bio->offs = bio->offs0 = txn->offs;
+    bio->data_avail = txn->data_size;
+    bio->offs_avail = txn->offs_size / 4;
+    bio->flags = BIO_F_SHARED;
+}
+
+void bio_init(struct binder_io *bio, void *data, uint32_t maxdata, uint32_t maxoffs)
+{
+    uint32_t n = maxoffs * sizeof(uint32_t);
+
+    if (n > maxdata) {
+        bio->flags = BIO_F_OVERFLOW;
+        bio->data_avail = 0;
+        bio->offs_avail = 0;
+        return;
+    }
+
+    bio->data = bio->data0 = data + n;
+    bio->offs = bio->offs0 = data;
+    bio->data_avail = maxdata - n;
+    bio->offs_avail = maxoffs;
+    bio->flags = 0;
+}
+```
+
+
+
+## svcmgr_handler
+
+
+
+frameworks\base\cmds\servicemanager\service_manager.c
+
+```c
+int svcmgr_handler(struct binder_state *bs,
+                   struct binder_txn *txn,
+                   struct binder_io *msg,
+                   struct binder_io *reply)
+{
+    struct svcinfo *si;
+    uint16_t *s;
+    unsigned len;
+    void *ptr;
+    uint32_t strict_policy;
+
+    if (txn->target != svcmgr_handle)
+        return -1;
+
+    // Equivalent to Parcel::enforceInterface(), reading the RPC
+    // header with the strict mode policy mask and the interface name.
+    // Note that we ignore the strict_policy and don't propagate it
+    // further (since we do no outbound RPCs anyway).
+    strict_policy = bio_get_uint32(msg);
+    s = bio_get_string16(msg, &len);
+    if ((len != (sizeof(svcmgr_id) / 2)) ||
+        memcmp(svcmgr_id, s, sizeof(svcmgr_id))) {
+        fprintf(stderr,"invalid id %s\n", str8(s));
+        return -1;
+    }
+
+    switch(txn->code) {
+    case SVC_MGR_GET_SERVICE:
+    case SVC_MGR_CHECK_SERVICE:
+        s = bio_get_string16(msg, &len);
+        ptr = do_find_service(bs, s, len);
+        if (!ptr)
+            break;
+        bio_put_ref(reply, ptr);
+        return 0;
+
+    case SVC_MGR_ADD_SERVICE:
+        s = bio_get_string16(msg, &len);
+        ptr = bio_get_ref(msg);
+        if (do_add_service(bs, s, len, ptr, txn->sender_euid))
+            return -1;
+        break;
+
+    case SVC_MGR_LIST_SERVICES: {
+        unsigned n = bio_get_uint32(msg);
+
+        si = svclist;
+        while ((n-- > 0) && si)
+            si = si->next;
+        if (si) {
+            bio_put_string16(reply, si->name);
+            return 0;
+        }
+        return -1;
+    }
+    default:
+        LOGE("unknown code %d\n", txn->code);
+        return -1;
+    }
+
+    bio_put_uint32(reply, 0);
+    return 0;
+}
+```
+
+
+
+## binder_send_reply
+
+
+
+frameworks\base\cmds\servicemanager\binder.c
+
+```c
+void binder_send_reply(struct binder_state *bs,
+                       struct binder_io *reply,
+                       void *buffer_to_free,
+                       int status)
+{
+    struct {
+        uint32_t cmd_free;
+        void *buffer;
+        uint32_t cmd_reply;
+        struct binder_txn txn;
+    } __attribute__((packed)) data;
+
+    data.cmd_free = BC_FREE_BUFFER;
+    data.buffer = buffer_to_free;
+    data.cmd_reply = BC_REPLY;
+    data.txn.target = 0;
+    data.txn.cookie = 0;
+    data.txn.code = 0;
+    if (status) {
+        data.txn.flags = TF_STATUS_CODE;
+        data.txn.data_size = sizeof(int);
+        data.txn.offs_size = 0;
+        data.txn.data = &status;
+        data.txn.offs = 0;
+    } else {
+        data.txn.flags = 0;
+        data.txn.data_size = reply->data - reply->data0;
+        data.txn.offs_size = ((char*) reply->offs) - ((char*) reply->offs0);
+        data.txn.data = reply->data0;
+        data.txn.offs = reply->offs0;
+    }
+    binder_write(bs, &data, sizeof(data));
+}
+```
+
+
+
+```c
+void *bio_get_ref(struct binder_io *bio)
+{
+    struct binder_object *obj;
+
+    obj = _bio_get_obj(bio);
+    if (!obj)
+        return 0;
+
+    if (obj->type == BINDER_TYPE_HANDLE)
+        return obj->pointer;
+
+    return 0;
+}
+```
 

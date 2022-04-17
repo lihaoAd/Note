@@ -1,3 +1,5 @@
+## WifiService
+
 frameworks\base\services\java\com\android\server\WifiService.java
 
 ```java
@@ -65,7 +67,7 @@ frameworks\base\core\java\android\os\Binder.java
 public class Binder implements IBinder {
 
     private int mObject;
-    private IInterface mOwner;
+    private IInterface mOwner;   
     private String mDescriptor;  // android.net.wifi.IWifiManager
     
     public Binder() {
@@ -201,12 +203,14 @@ private ConnectivityService(Context context) {
 
 `WifiService`是`Binder`的子类,构造函数中有个`init`方法,这个`init`就对应`JNI`层的`android_os_Binder_init`
 
+
+
 frameworks\base\core\jni\android_util_Binder.cpp
 
 ```c++
 static void android_os_Binder_init(JNIEnv* env, jobject clazz)
 {
-    // clazz就是WifiService对象
+    // clazz就是java层的WifiService对象
     JavaBBinderHolder* jbh = new JavaBBinderHolder(env, clazz);
     if (jbh == NULL) {
         jniThrowException(env, "java/lang/OutOfMemoryError", NULL);
@@ -288,7 +292,7 @@ public:
         incRefsCreated(env);
     }
 
-    bool    checkSubclass(const void* subclassID) const
+    bool   checkSubclass(const void* subclassID) const
     {
         return subclassID == &gBinderOffsets;
     }
@@ -712,6 +716,7 @@ status_t IPCThreadState::transact(int32_t handle,
     ...
     
     if (err == NO_ERROR) {
+        // 将数据转换为binder_transaction_data后，在写入到mOut中
         err = writeTransactionData(BC_TRANSACTION, flags, handle, code, data, NULL);
     }
     
@@ -721,34 +726,18 @@ status_t IPCThreadState::transact(int32_t handle,
     }
     
     if ((flags & TF_ONE_WAY) == 0) {
-        #if 0
-        if (code == 4) { // relayout
-            LOGI(">>>>>> CALLING transaction 4");
-        } else {
-            LOGI(">>>>>> CALLING transaction %d", code);
-        }
-        #endif
+        // 同步消息
+       ...
         if (reply) {
+            // 希望有回复
             err = waitForResponse(reply);
         } else {
             Parcel fakeReply;
             err = waitForResponse(&fakeReply);
         }
-        #if 0
-        if (code == 4) { // relayout
-            LOGI("<<<<<< RETURNING transaction 4");
-        } else {
-            LOGI("<<<<<< RETURNING transaction %d", code);
-        }
-        #endif
+       ...
         
-        IF_LOG_TRANSACTIONS() {
-            TextOutput::Bundle _b(alog);
-            alog << "BR_REPLY thr " << (void*)pthread_self() << " / hand "
-                << handle << ": ";
-            if (reply) alog << indent << *reply << dedent << endl;
-            else alog << "(none requested)" << endl;
-        }
+        ...
     } else {
         err = waitForResponse(NULL, NULL);
     }
@@ -767,15 +756,21 @@ status_t IPCThreadState::writeTransactionData(int32_t cmd, uint32_t binderFlags,
 {
     binder_transaction_data tr;
 
+    // 此时我们正想和serviceManager通信。所以handle为0
     tr.target.handle = handle;
+    // 此时wifiservice想要注册，所以code为ADD_SERVICE_TRANSACTION
     tr.code = code;
     tr.flags = binderFlags;
     
     const status_t err = data.errorCheck();
     if (err == NO_ERROR) {
+        // Parcel中数据量的大小
         tr.data_size = data.ipcDataSize();
+        // Parcel中数据缓冲区的地址
         tr.data.ptr.buffer = data.ipcData();
+        // Parcel中偏移数组的大小
         tr.offsets_size = data.ipcObjectsCount()*sizeof(size_t);
+        // Parcel中偏移数组的地址
         tr.data.ptr.offsets = data.ipcObjects();
     } else if (statusBuffer) {
         tr.flags |= TF_STATUS_CODE;
@@ -788,7 +783,10 @@ status_t IPCThreadState::writeTransactionData(int32_t cmd, uint32_t binderFlags,
         return (mLastError = err);
     }
     
+    // 再把数据写入到mOut中
+    // 首先是 BC_TRANSACTION 
     mOut.writeInt32(cmd);
+    // 然后是binder_transaction_data的地址
     mOut.write(&tr, sizeof(tr));
     
     return NO_ERROR;
@@ -809,6 +807,14 @@ frameworks\base\include\binder\IPCThreadState.h
 
 ```c++
  status_t            talkWithDriver(bool doReceive=true);
+```
+
+
+
+drivers\staging\android\binder.h
+
+```c#
+#define BINDER_WRITE_READ   		_IOWR('b', 1, struct binder_write_read)
 ```
 
 
@@ -853,6 +859,7 @@ status_t IPCThreadState::talkWithDriver(bool doReceive)
     do {
        ...
 #if defined(HAVE_ANDROID_OS)
+           // BINDER_WRITE_READ:  _IOWR('b', 1, struct binder_write_read)
         if (ioctl(mProcess->mDriverFD, BINDER_WRITE_READ, &bwr) >= 0)
             err = NO_ERROR;
         else
@@ -889,14 +896,20 @@ status_t IPCThreadState::talkWithDriver(bool doReceive)
 drivers\staging\android\binder.c
 
 ```c
-// cmd:就是上面传进来的 BINDER_WRITE_READ
+// cmd:就是上面传进来的 BINDER_WRITE_READ,而BINDER_WRITE_READ就是 _IOWR('b', 1, struct binder_write_read)
 // arg:就是&bwr地址
 static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	int ret;
-	struct binder_proc *proc = filp->private_data;
+	//  wifiservce进程在open("/dev/binder")时已经创建了proc
+    struct binder_proc *proc = filp->private_data;
+    
 	struct binder_thread *thread;
+    
+    // struct binder_write_read的大小
 	unsigned int size = _IOC_SIZE(cmd);
+
+    // binder_write_read的用户空间地址
 	void __user *ubuf = (void __user *)arg;
 
 	ret = wait_event_interruptible(binder_user_error_wait, binder_stop_on_user_error < 2);
@@ -978,8 +991,7 @@ drivers\staging\android\binder.c
 
 ```c
 int
-binder_thread_write(struct binder_proc *proc, struct binder_thread *thread,
-		    void __user *buffer, int size, signed long *consumed)
+binder_thread_write(struct binder_proc *proc, struct binder_thread *thread, void __user *buffer, int size, signed long *consumed)
 {
 	uint32_t cmd;
     // 驱动需要读取缓冲区的起始于结束地址
@@ -1102,6 +1114,7 @@ drivers\staging\android\binder.c
        
 
 	/* TODO: reuse incoming transaction for reply */
+    // 分配 binder_transaction空间
 	t = kzalloc(sizeof(*t), GFP_KERNEL);
 	if (t == NULL) {
 		return_error = BR_FAILED_REPLY;
@@ -1109,6 +1122,7 @@ drivers\staging\android\binder.c
 	}
 	...
 
+    // 分配 binder_work空间
 	tcomplete = kzalloc(sizeof(*tcomplete), GFP_KERNEL);
 	if (tcomplete == NULL) {
 		return_error = BR_FAILED_REPLY;
@@ -1123,7 +1137,7 @@ drivers\staging\android\binder.c
     // 我们现在正在处理BC_TRANSACTION，即reply值为0，!reply 就是true
 	if (!reply && !(tr->flags & TF_ONE_WAY))
         // 处理BC_TRANSACTION的同步请求
-        // 把客户段的线程放在from中，以便目标线程或者进程处理完请求后，通知源线程
+        // 把客户端的线程放在from中，以便目标线程或者进程处理完请求后，通知源线程
 		t->from = thread;
 	else
 		t->from = NULL;
@@ -1154,6 +1168,7 @@ drivers\staging\android\binder.c
 	offp = (size_t *)(t->buffer->data + ALIGN(tr->data_size, sizeof(void *)));
 
    
+ 	// 将用户空间tr->data.ptr.buffer 的数据拷贝到t->buffer->data，数据大小为tr->data_size
 	if (copy_from_user(t->buffer->data, tr->data.ptr.buffer, tr->data_size)) {
 		binder_user_error("binder: %d:%d got transaction with invalid "
 			"data ptr\n", proc->pid, thread->pid);
@@ -1161,12 +1176,14 @@ drivers\staging\android\binder.c
 		goto err_copy_data_failed;
 	}
  	
+	// 拷贝偏移数组
 	if (copy_from_user(offp, tr->data.ptr.offsets, tr->offsets_size)) {
 		binder_user_error("binder: %d:%d got transaction with invalid "
 			"offsets ptr\n", proc->pid, thread->pid);
 		return_error = BR_FAILED_REPLY;
 		goto err_copy_data_failed;
 	}
+
 	if (!IS_ALIGNED(tr->offsets_size, sizeof(size_t))) {
 		binder_user_error("binder: %d:%d got transaction with "
 			"invalid offsets size, %zd\n",
@@ -1174,12 +1191,15 @@ drivers\staging\android\binder.c
 		return_error = BR_FAILED_REPLY;
 		goto err_bad_offset;
 	}
+	
+	// 
 	off_end = (void *)offp + tr->offsets_size;
 ```
 
 drivers\staging\android\binder.c
 
 ```c++
+	// 处理通信数据中的binder对象
 	for (; offp < off_end; offp++) {
 		struct flat_binder_object *fp;
 		if (*offp > t->buffer->data_size - sizeof(*fp) ||
@@ -1191,6 +1211,7 @@ drivers\staging\android\binder.c
 			return_error = BR_FAILED_REPLY;
 			goto err_bad_offset;
 		}
+        // offp中存的是偏移地址
 		fp = (struct flat_binder_object *)(t->buffer->data + *offp);
 		switch (fp->type) {
 		case BINDER_TYPE_BINDER:

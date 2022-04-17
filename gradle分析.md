@@ -12,7 +12,7 @@
 
 就会执行到这条命令
 
-````
+````c#
 "%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %CMD_LINE_ARGS%
 ````
 
@@ -28,7 +28,7 @@
 
 该类的源码位于`src\wrapper`
 
-```
+```java
  public static void main(String[] args) throws Exception {
  
  		// jar包路径
@@ -69,7 +69,7 @@
 
 
 
-```
+```java
 private static File gradleUserHome(ParsedCommandLine options) {
         if (options.hasOption(GRADLE_USER_HOME_OPTION)) {
             // 如果使用 g 指定gradle home ，就用这个
@@ -81,7 +81,7 @@ private static File gradleUserHome(ParsedCommandLine options) {
 
 
 
-```
+```java
 public class GradleUserHomeLookup {
     public static final String DEFAULT_GRADLE_USER_HOME = System.getProperty("user.home") + "/.gradle";
     public static final String GRADLE_USER_HOME_PROPERTY_KEY = "gradle.user.home";
@@ -104,7 +104,7 @@ public class GradleUserHomeLookup {
 
 到`org.gradle.wrapper.WrapperExecutor`中分析
 
-````
+````v
     public static final String DISTRIBUTION_URL_PROPERTY = "distributionUrl";
     public static final String DISTRIBUTION_BASE_PROPERTY = "distributionBase";
     public static final String DISTRIBUTION_PATH_PROPERTY = "distributionPath";
@@ -115,7 +115,7 @@ public class GradleUserHomeLookup {
 
 这个是和我们gradle-wrapper.properties文件中的类似
 
-````
+````java
  public static WrapperExecutor forWrapperPropertiesFile(File propertiesFile) {
         if (!propertiesFile.exists()) {
             throw new RuntimeException(String.format("Wrapper properties file '%s' does not exist.", propertiesFile));
@@ -124,7 +124,7 @@ public class GradleUserHomeLookup {
     }
 ````
 
-```
+```java
 WrapperExecutor(File propertiesFile, Properties properties) {
         this.properties = properties;
         this.propertiesFile = propertiesFile; // 我们的gradle-wrapper.properties文件
@@ -161,7 +161,7 @@ WrapperExecutor(File propertiesFile, Properties properties) {
 
 
 
-```
+```java
  public void execute(String[] args, Install install, BootstrapMainStarter bootstrapMainStarter) throws Exception {
         File gradleHome = install.createDist(config);
         bootstrapMainStarter.start(args, gradleHome);

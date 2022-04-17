@@ -1,3 +1,76 @@
+## IOC
+
+include\asm-generic\ioctl.h
+
+```c#
+#define _IOC_NRBITS	8        // 序数（number）字段的字位宽度，8bits
+#define _IOC_TYPEBITS	8    // 魔数（type）字段的字位宽度，8bits
+
+#ifndef _IOC_SIZEBITS
+# define _IOC_SIZEBITS	14   // 大小（size）字段的字位宽度，14bits
+#endif
+
+#ifndef _IOC_DIRBITS
+# define _IOC_DIRBITS	2   // 方向（direction）字段的字位宽度，2bits
+#endif
+
+#define _IOC_NRMASK	((1 << _IOC_NRBITS)-1)          // 序数字段的掩码，0x000000F
+#define _IOC_TYPEMASK	((1 << _IOC_TYPEBITS)-1)    // 魔数字段的掩码，0x000000FF
+#define _IOC_SIZEMASK	((1 << _IOC_SIZEBITS)-1)    // 大小字段的掩码，0x00003FFF
+#define _IOC_DIRMASK	((1 << _IOC_DIRBITS)-1)     // 方向字段的掩码，0x00000003
+ 
+#define _IOC_NRSHIFT	0                                // 序数字段在整个字段中的位移，0
+#define _IOC_TYPESHIFT	(_IOC_NRSHIFT+_IOC_NRBITS)       // 魔数字段的位移，8
+#define _IOC_SIZESHIFT	(_IOC_TYPESHIFT+_IOC_TYPEBITS)   // 大小字段的位移，16
+#define _IOC_DIRSHIFT	(_IOC_SIZESHIFT+_IOC_SIZEBITS)   // 方向字段的位移，30
+
+#ifndef _IOC_NONE
+# define _IOC_NONE	0U        // 没有数据传输
+#endif 
+
+#ifndef _IOC_WRITE
+# define _IOC_WRITE	1U       // 向设备写入数据，驱动程序必须从用户空间读入数据
+#endif
+
+#ifndef _IOC_READ
+# define _IOC_READ	2U       // 向设备写入数据，驱动程序必须从用户空间读入数据
+#endif
+    
+#define _IOC(dir,type,nr,size) \
+	(((dir)  << _IOC_DIRSHIFT) | \       // 左移30bit
+	 ((type) << _IOC_TYPESHIFT) | \      // 左移8bit
+	 ((nr)   << _IOC_NRSHIFT) | \        // 左移0bit 
+	 ((size) << _IOC_SIZESHIFT))         // 左移16bit
+
+
+/* used to create numbers */
+// 构造无参数的命令编号
+#define _IO(type,nr)		_IOC(_IOC_NONE,(type),(nr),0)
+
+// 构造从驱动程序中读取数据的命令编号
+#define _IOR(type,nr,size)	_IOC(_IOC_READ,(type),(nr),(_IOC_TYPECHECK(size)))
+
+// 用于向驱动程序写入数据命令    
+#define _IOW(type,nr,size)	_IOC(_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
+    
+//用于双向传输    
+#define _IOWR(type,nr,size)	_IOC(_IOC_READ|_IOC_WRITE,(type),(nr),(_IOC_TYPECHECK(size)))
+#define _IOR_BAD(type,nr,size)	_IOC(_IOC_READ,(type),(nr),sizeof(size))
+#define _IOW_BAD(type,nr,size)	_IOC(_IOC_WRITE,(type),(nr),sizeof(size))
+#define _IOWR_BAD(type,nr,size)	_IOC(_IOC_READ|_IOC_WRITE,(type),(nr),sizeof(size))
+```
+
+- dir(direction)，ioctl命令访问模式（数据传输方向），占据2bit，可以为_IOC_NONE、_IOC_READ、_IOC_WRITE _IOC_READ | _IOC_WRITE，分别指示了四种访问模式：无数据、读数据、写数据、读写数据
+
+- type(device type)，设备类型，占据8bit，在一些文献中翻译为“幻数”或者“魔数”，可以为任意char型字符，例如‘a’、‘b’、‘c’等等，其主要作用是使ioctl命令有唯一的设备标识；
+  tips：Documentions/ioctl-number.txt记录了在内核中已经使用的“魔数”字符，为避免冲突，在自定义ioctl命令之前应该先查阅该文档
+
+- nr(number)，命令编号/序数，占据8bit，可以为任意unsigned char型数据，取值范围0~255，如果定义了多个ioctl命令，通常从0开始编号递增；
+
+- size，涉及到ioctl第三个参数arg，占据13bit或者14bit（体系相关，arm架构一般为14位），指定了arg的数据类型及长度,如果在驱动的ioctl实现中不检查，通常可以忽略该参数。
+
+![image-20220416234633911](./img/image-20220416234633911.png)
+
 ## list_head
 
 *include/linux/list.h*
@@ -168,15 +241,18 @@ drivers/staging/android/binder.c
 
 ```c
 struct binder_proc {
+    // 嵌入的列表,所有的binder_proc都在内核的binder_procs这个列表上，proc_node含有next和pre指针，
 	struct hlist_node proc_node;
     
     // 一个进程的所有Binder线程都保存在threads的红黑树中
 	struct rb_root threads;
 	
-    // 一个进程的所有Binder实体对象都保存在nodes红黑树中
+    // 一个进程的所有Binder实体对象binder_node都保存在nodes红黑树中
     struct rb_root nodes;
+    
 	struct rb_root refs_by_desc;
 	struct rb_root refs_by_node;
+    
 	int pid;
 	struct vm_area_struct *vma;
 	struct task_struct *tsk;
@@ -460,6 +536,149 @@ enum {
     
     // 描述一个文件描述符
 	BINDER_TYPE_FD		= B_PACK_CHARS('f', 'd', '*', B_TYPE_LARGE),
+};
+```
+
+
+
+## BinderDriverCommandProtocol
+
+drivers\staging\android\binder.h
+
+```c#
+enum BinderDriverCommandProtocol {
+	BC_TRANSACTION = _IOW('c', 0, struct binder_transaction_data),
+	BC_REPLY = _IOW('c', 1, struct binder_transaction_data),
+	/*
+	 * binder_transaction_data: the sent command.
+	 */
+
+	BC_ACQUIRE_RESULT = _IOW('c', 2, int),
+	/*
+	 * not currently supported
+	 * int:  0 if the last BR_ATTEMPT_ACQUIRE was not successful.
+	 * Else you have acquired a primary reference on the object.
+	 */
+
+	BC_FREE_BUFFER = _IOW('c', 3, int),
+	/*
+	 * void *: ptr to transaction data received on a read
+	 */
+
+	BC_INCREFS = _IOW('c', 4, int),
+	BC_ACQUIRE = _IOW('c', 5, int),
+	BC_RELEASE = _IOW('c', 6, int),
+	BC_DECREFS = _IOW('c', 7, int),
+	/*
+	 * int:	descriptor
+	 */
+
+	BC_INCREFS_DONE = _IOW('c', 8, struct binder_ptr_cookie),
+	BC_ACQUIRE_DONE = _IOW('c', 9, struct binder_ptr_cookie),
+	/*
+	 * void *: ptr to binder
+	 * void *: cookie for binder
+	 */
+
+	BC_ATTEMPT_ACQUIRE = _IOW('c', 10, struct binder_pri_desc),
+	/*
+	 * not currently supported
+	 * int: priority
+	 * int: descriptor
+	 */
+
+	BC_REGISTER_LOOPER = _IO('c', 11),
+	/*
+	 * No parameters.
+	 * Register a spawned looper thread with the device.
+	 */
+
+	BC_ENTER_LOOPER = _IO('c', 12),
+	BC_EXIT_LOOPER = _IO('c', 13),
+	/*
+	 * No parameters.
+	 * These two commands are sent as an application-level thread
+	 * enters and exits the binder loop, respectively.  They are
+	 * used so the binder can have an accurate count of the number
+	 * of looping threads it has available.
+	 */
+
+	BC_REQUEST_DEATH_NOTIFICATION = _IOW('c', 14, struct binder_ptr_cookie),
+	/*
+	 * void *: ptr to binder
+	 * void *: cookie
+	 */
+
+	BC_CLEAR_DEATH_NOTIFICATION = _IOW('c', 15, struct binder_ptr_cookie),
+	/*
+	 * void *: ptr to binder
+	 * void *: cookie
+	 */
+
+	BC_DEAD_BINDER_DONE = _IOW('c', 16, void *),
+	/*
+	 * void *: cookie
+	 */
+};
+
+```
+
+
+
+## binder_txn
+
+frameworks\base\cmds\servicemanager\binder.h
+
+```c
+struct binder_txn
+{
+    void *target;
+    void *cookie;
+    uint32_t code;
+    uint32_t flags;
+
+    uint32_t sender_pid;
+    uint32_t sender_euid;
+
+    uint32_t data_size;
+    uint32_t offs_size;
+    void *data;
+    void *offs;
+};
+```
+
+用来描述进程间通信数据
+
+## binder_io
+
+frameworks\base\cmds\servicemanager\binder.h
+
+```c
+struct binder_io
+{
+    char *data;            /* pointer to read/write from */
+    uint32_t *offs;        /* array of offsets */
+    uint32_t data_avail;   /* bytes available in data buffer */
+    uint32_t offs_avail;   /* entries available in offsets array */
+
+    char *data0;           /* start of data buffer */
+    uint32_t *offs0;       /* start of offsets buffer */
+    uint32_t flags;
+    uint32_t unused;
+};
+```
+
+
+
+frameworks\base\cmds\servicemanager\binder.h
+
+```c
+struct binder_object
+{
+    uint32_t type;
+    uint32_t flags;
+    void *pointer;
+    void *cookie;
 };
 ```
 
