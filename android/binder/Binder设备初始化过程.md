@@ -143,9 +143,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 
 打开binder设备就会创建`binder_proc`结构体，表示打开binder设备的宿主进程。最后所有的`binder_proc`都保存在内核的`binder_procs`中。
 
-
-
-![image-20220404215308189](./img/image-20220404215308189.png)
+![image-20220418224937656](./img/image-20220418224937656.png)
 
 ## binder_mmap
 
@@ -211,7 +209,6 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 	vma->vm_ops = &binder_vm_ops;
 	vma->vm_private_data = proc;
 
-	// 先分配一页的空间，按需分配
 	// 完成内核空间地址与用户空间地址的映射
 	if (binder_update_page_range(proc, 1, proc->buffer, proc->buffer + PAGE_SIZE, vma)) {
 		ret = -ENOMEM;
@@ -219,8 +216,11 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 		goto err_alloc_small_buf_failed;
 	}
     
+    // buffer就是内核的缓冲区地址
 	buffer = proc->buffer;
+    // 初始化缓冲区列表
 	INIT_LIST_HEAD(&proc->buffers);
+    // 把这个buffer添加到buffers列表中
 	list_add(&buffer->entry, &proc->buffers);
 	// 刚分配的空间可以使用
 	buffer->free = 1;
@@ -230,8 +230,8 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
     // 设置异步事务的内核缓冲区大小为其一半，防止异步事务消耗过多的内核缓冲区
 	proc->free_async_space = proc->buffer_size / 2;
 	barrier();
-	proc->files = get_files_struct(current);
-	proc->vma = vma;
+	p
+        
 
 	/*printk(KERN_INFO "binder_mmap: %d %lx-%lx maps %p\n", proc->pid, vma->vm_start, vma->vm_end, proc->buffer);*/
 	return 0;
@@ -297,6 +297,7 @@ static int binder_update_page_range(struct binder_proc *proc, int allocate, void
 	}
 
 	for (page_addr = start; page_addr < end; page_addr += PAGE_SIZE) {
+        // 由于内核地址空间start~end之间可能包含了多个页面，因此for循环依次为每一个虚拟地址空间分配一个物理页面
 		int ret;
 		struct page **page_array_ptr;
 		// 获取一个内核地址空间的页面指针
@@ -325,9 +326,9 @@ static int binder_update_page_range(struct binder_proc *proc, int allocate, void
 			       proc->pid, page_addr);
 			goto err_map_kernel_failed;
 		}
+        
 		// 计算用户空间的地址
-		user_page_addr =
-			(uintptr_t)page_addr + proc->user_buffer_offset;
+		user_page_addr = (uintptr_t)page_addr + proc->user_buffer_offset;
 		// 用户空间地址映射
 		ret = vm_insert_page(vma, user_page_addr, page[0]);
 		if (ret) {
@@ -345,8 +346,7 @@ static int binder_update_page_range(struct binder_proc *proc, int allocate, void
 	return 0;
 
 free_range:
-	for (page_addr = end - PAGE_SIZE; page_addr >= start;
-	     page_addr -= PAGE_SIZE) {
+	for (page_addr = end - PAGE_SIZE; page_addr >= start;page_addr -= PAGE_SIZE) {
 		page = &proc->pages[(page_addr - proc->buffer) / PAGE_SIZE];
 		if (vma)
 			zap_page_range(vma, (uintptr_t)page_addr +
@@ -371,6 +371,7 @@ err_no_vma:
 
 
 ```c
+//  将一个空闲的内核缓冲区加入到进程的空闲内核缓冲区红黑树中
 static void binder_insert_free_buffer(struct binder_proc *proc, struct binder_buffer *new_buffer)
 {
 	// 红黑树
@@ -384,6 +385,7 @@ static void binder_insert_free_buffer(struct binder_proc *proc, struct binder_bu
 	BUG_ON(!new_buffer->free);
 
     // 计算这个binder_buffer大小，注意是有效数据大小
+    
 	new_buffer_size = binder_buffer_size(proc, new_buffer);
 
 	...
@@ -410,11 +412,14 @@ static void binder_insert_free_buffer(struct binder_proc *proc, struct binder_bu
 
 
 ```c
+// 计算缓冲区的大小，注意缓冲区的大小指的是其有效数据块的大小，不包括binder_buffer结构体
 static size_t binder_buffer_size(struct binder_proc *proc, struct binder_buffer *buffer)
 {
 	if (list_is_last(&buffer->entry, &proc->buffers))
+        // 如果是最后一个元素，那么有效数据就是从它的data成员开始一直到buffer最后。
 		return proc->buffer + proc->buffer_size - (void *)buffer->data;
 	else
+        // 如果不是最后，缓冲区`binder_buffer`的大小就是data到下一个binder_buffer范围。
 		return (size_t)list_entry(buffer->entry.next,struct binder_buffer, entry) - (size_t)buffer->data;
 }
 ```

@@ -263,8 +263,11 @@ struct binder_proc {
 	ptrdiff_t user_buffer_offset;
 
 	struct list_head buffers;
+    
+    // 空闲内核缓冲区，红黑树中的节点就是按照缓冲区中有效数据的大小
 	struct rb_root free_buffers;
 	struct rb_root allocated_buffers;
+    
 	size_t free_async_space;
 
 	struct page **pages;
@@ -283,6 +286,8 @@ struct binder_proc {
 ```
 
 `binder_proc`结构体是 `open("/dev/binder")`设备时会为该进程创建。在驱动中表示打开binder设备的宿主进程。
+
+![image-20220420231400975](./img/image-20220420231400975.png)
 
 ## binder_thread
 
