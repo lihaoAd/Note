@@ -21,7 +21,8 @@ int main(int argc, char **argv)
     
 	// kmalloc() 申请的内存位于物理内存映射区域，而且在物理上也是连续的，
 	// 它们与真实的物理地址只有一个固定的偏移，因为存在较简单的转换关系，
-	// 所以对申请的内存大小有限制，不能超过128KB
+	// servicemanager 为什么才开 128k 的空间呢，去看看 servicemanager 的接口就知道了，
+    // 它一共才3个接口：addService、getSerivce、checkSerivce，参数都没几个，所以 128k 肯定够了
     bs = binder_open(128*1024);
 
     // 2.注册成为上下文管理者

@@ -1,23 +1,38 @@
 ## binder_init
 
-drivers/staging/android/binder.c
+binder设备的初始化是在Binder驱动程序的初始化函数`binder_init`中。
 
-binder设备的初始化是在Binder驱动程序的初始化函数binder_init中。
+drivers/staging/android/binder.c
 
 ```c
 static int __init binder_init(void)
 {
 	int ret;
 
+	// 在proc中创建一个文件，即创建/proc/binder/目录
+	// proc_mkdir 创建的文件夹路径，就是在哪个文件夹中创建，如果是proc根目录，参数2为NULL
 	binder_proc_dir_entry_root = proc_mkdir("binder", NULL);
 	if (binder_proc_dir_entry_root)
+		// 创建/proc/binder/proc/目录
 		binder_proc_dir_entry_proc = proc_mkdir("proc", binder_proc_dir_entry_root);
+		
+	// 注册binder驱动
 	ret = misc_register(&binder_miscdev);
+	
 	if (binder_proc_dir_entry_root) {
+		// 创建/proc/binder/state文件
 		create_proc_read_entry("state", S_IRUGO, binder_proc_dir_entry_root, binder_read_proc_state, NULL);
+        
+		// 创建/proc/binder/states文件
 		create_proc_read_entry("stats", S_IRUGO, binder_proc_dir_entry_root, binder_read_proc_stats, NULL);
+		
+        // 创建/proc/binder/transactions文件
 		create_proc_read_entry("transactions", S_IRUGO, binder_proc_dir_entry_root, binder_read_proc_transactions, NULL);
+		
+        // 创建/proc/binder/transaction_log文件
 		create_proc_read_entry("transaction_log", S_IRUGO, binder_proc_dir_entry_root, binder_read_proc_transaction_log, &binder_transaction_log);
+		
+        // 创建/proc/binder/failed_transaction_log文件
 		create_proc_read_entry("failed_transaction_log", S_IRUGO, binder_proc_dir_entry_root, binder_read_proc_transaction_log, &binder_transaction_log_failed);
 	}
 	return ret;
@@ -25,8 +40,6 @@ static int __init binder_init(void)
 
 device_initcall(binder_init);
 ```
-
-创建了`/proc/binder/proc`目录
 
 ## binder_open
 
@@ -79,7 +92,7 @@ static struct hlist_head binder_procs = {  .first = NULL }
 
 
 
-
+调用`open(/dev/binder)`会在内核中创建`binder_proc`结构体，来描述该进程，并且在`/proc/binder/proc/`目录下创建了一个以该进程`PID`的文件名，读取它，就可以知道进程pid的binder线程池、binder_node、binder_ref、以及内核缓冲区等信息
 
 drivers\staging\android\binder.c
 
@@ -96,7 +109,9 @@ static int binder_open(struct inode *nodp, struct file *filp)
 	proc = kzalloc(sizeof(*proc), GFP_KERNEL); // 分配binder_proc结构体内存空间
 	if (proc == NULL)
 		return -ENOMEM;
+    // 增加current引用计数
 	get_task_struct(current);
+    
 	proc->tsk = current;     // 关联当前宿主进程
 	/*
 		static inline void INIT_LIST_HEAD(struct list_head *list)
@@ -129,6 +144,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 	filp->private_data = proc;
 	mutex_unlock(&binder_lock);
 
+    // binder_proc_dir_entry_proc 就是  /proc/binder/proc/ 目录
 	if (binder_proc_dir_entry_proc) {
 		char strbuf[11];
 		snprintf(strbuf, sizeof(strbuf), "%u", proc->pid);
@@ -145,21 +161,31 @@ static int binder_open(struct inode *nodp, struct file *filp)
 
 ![image-20220418224937656](./img/image-20220418224937656.png)
 
+
+
+![](./img/binder_main_struct.png)
+
 ## binder_mmap
+
+注意binder驱动允许映射的最大空间就是`SZ_4M`,而 Android 用户空间限制为 `(1M – 8K)`,binder_mmap 分配了一个page用于映射，用来存放第一个binder_Buffer。此时，活页夹内存中只有一个空闲缓冲区。mmap完成后，`proc>buffers` 队列中只有一个节点，指向`proc>buffer`，大小为整个map空间。`proc->free_buffers` 树中只有一个节点，`proc>allocate_buffers `树为空。
 
 drivers/staging/android/binder.c
 
 ```c
+#define SZ_4M                               0x400000
+
+....
+
 static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	int ret;
-	// 描述内核地址空间
+	// 描述内核虚拟地址空间
 	struct vm_struct *area;
 	struct binder_proc *proc = filp->private_data;
 	const char *failure_string;
 	struct binder_buffer *buffer;
 
-	// biner驱动最多可以为进程分配4M内核缓冲区来传输进程间通信数据
+	// biner驱动最多可以为进程分配 4M 内核缓冲区来传输进程间通信数据
 	if ((vma->vm_end - vma->vm_start) > SZ_4M)
 		vma->vm_end = vma->vm_start + SZ_4M;
 
@@ -171,6 +197,7 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 		failure_string = "bad vm_flags";
 		goto err_bad_arg;
 	}
+    
 	// 不可以拷贝以及禁止设置可能会执行写操作标志位
 	vma->vm_flags = (vma->vm_flags | VM_DONTCOPY) & ~VM_MAYWRITE;
 	
@@ -180,15 +207,18 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 		failure_string = "already mapped";
 		goto err_already_mapped;
 	}
+    
 	// vma已经在用户空间申请了vma->vm_end - vma->vm_start 的空间
     // 在进程的内核空间也申请一段大小为 vma->vm_end - vma->vm_start 的空间
 	// 最后这两段地址都会指向一样的物理内存
 	area = get_vm_area(vma->vm_end - vma->vm_start, VM_IOREMAP);
+    
 	if (area == NULL) {
 		ret = -ENOMEM;
 		failure_string = "get_vm_area";
 		goto err_get_vm_area_failed;
 	}
+    
 	// 内核缓冲区的地址保存在buffer中
 	proc->buffer = area->addr;
 	// 用户空间的地址与内核的缓冲区地址之间的差值
@@ -209,7 +239,7 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 	vma->vm_ops = &binder_vm_ops;
 	vma->vm_private_data = proc;
 
-	// 完成内核空间地址与用户空间地址的映射
+	// 完成内核空间地址与用户空间地址的映射，注意这里只分配了一页的物理内存，节约空间，按需分配
 	if (binder_update_page_range(proc, 1, proc->buffer, proc->buffer + PAGE_SIZE, vma)) {
 		ret = -ENOMEM;
 		failure_string = "alloc small buf";
@@ -253,7 +283,8 @@ err_bad_arg:
 
 
 ```c
-/**
+/** 该函数真正实现了内存分配和地址映射
+
 	proc：目标进程
 	allocate：如果是1就是分配物理页面，否则就是释放
 	start：内核缓冲区的起始地址
@@ -329,7 +360,8 @@ static int binder_update_page_range(struct binder_proc *proc, int allocate, void
         
 		// 计算用户空间的地址
 		user_page_addr = (uintptr_t)page_addr + proc->user_buffer_offset;
-		// 用户空间地址映射
+        
+		// 用户空间地址映射,更新vma对应的页表，这样就是实现了mmap功能
 		ret = vm_insert_page(vma, user_page_addr, page[0]);
 		if (ret) {
 			printk(KERN_ERR "binder: %d: binder_alloc_buf failed "
@@ -367,6 +399,16 @@ err_no_vma:
 	return -ENOMEM;
 }
 ```
+
+![](./img/mmap_and_transaction.png)
+
+1、Server启动后，调用mmap到/dev/binder设备 
+
+2、内核中的binder_mmap函数进行相应的处理：申请一块物理内存，然后映射同时在用户空间和内核空间 
+
+3、客户端通过 BINDER_WRITE_READ 命令发送请求。该请求将首先到达驱动程序。同时，需要将数据从客户端进程的用户空间复制到内核空间。
+
+4、驱动程序通过BR_TRANSACTION通知服务器有人发送了请求，服务器处理。由于这块内存也是映射在用户空间的，所以可以直接访问Server进程的代码
 
 
 

@@ -212,7 +212,10 @@ struct binder_node {
 	int local_weak_refs;
     // 内部强引用计数
 	int local_strong_refs;
-	void __user *ptr;
+    
+    // 指向用户态Binder实例的指针，通常指向BBinder的弱引用
+	void __user *ptr; 
+    // 自定义数据，通常为指向BBinder的指针
 	void __user *cookie;
 	unsigned has_strong_ref : 1;
 	unsigned pending_strong_ref : 1;
@@ -254,13 +257,13 @@ struct binder_proc {
 	struct rb_root refs_by_node;
     
 	int pid;
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma;   // 为调用进程的一段用户空间
 	struct task_struct *tsk;
 	struct files_struct *files;
 	struct hlist_node deferred_work_node;
 	int deferred_work;
-	void *buffer;
-	ptrdiff_t user_buffer_offset;
+	void *buffer;                  // 为内核连续映射区首地址
+	ptrdiff_t user_buffer_offset;  // 为用户空间映射区首地址-内核空间连续映射的首地址,是一个负值
 
 	struct list_head buffers;
     
@@ -270,8 +273,8 @@ struct binder_proc {
     
 	size_t free_async_space;
 
-	struct page **pages;
-	size_t buffer_size;
+	struct page **pages; //为分配的物理页page的指针数组，开始只有一项，即1页，但是长度还是预留好了；
+	size_t buffer_size;  // 为需要映射的长度（小于4m）-sizeof（struct binder_buffer）
 	uint32_t buffer_free;
 	struct list_head todo;
 	wait_queue_head_t wait;
@@ -297,9 +300,9 @@ drivers/staging/android/binder.c
 
 ```c
 struct binder_thread {
-	struct binder_proc *proc;
-	struct rb_node rb_node;
-	int pid;
+	struct binder_proc *proc;  // 线程所属进程的binder_proc
+	struct rb_node rb_node; // binder_thread通过rb_node链入到binder_proc的threads成员指向的红黑树中
+	int pid;  // //线程号
 	int looper;
 	struct binder_transaction *transaction_stack;   // 如果transaction_stack不为NULL，说明该binder线程在等待其他线程完成另一个事务
 	struct list_head todo;   // 如果todo队列不为NULL，说明该线程有未处理的工作
@@ -483,15 +486,15 @@ struct binder_ref {
 	/*   desc + proc => ref (transaction, inc/dec ref) */
 	/*   node => refs + procs (proc exit) */
 	int debug_id;
-	struct rb_node rb_node_desc;
-	struct rb_node rb_node_node;
-	struct hlist_node node_entry;
-	struct binder_proc *proc;
-	struct binder_node *node;
-	uint32_t desc;
-	int strong;
-	int weak;
-	struct binder_ref_death *death;
+	struct rb_node rb_node_desc; // binder_ref通过本节点，链入到binder_proc的refs_by_desc所指向的红黑树中
+	struct rb_node rb_node_node; // 链入到binder_proc的refs_by_node所指向的红黑树中
+	struct hlist_node node_entry; // binder_ref通过本节点，链入到binder_node的refs成员所指向的双向链表中
+	struct binder_proc *proc; // 所属的binder_proc
+	struct binder_node *node; // 所指向的binder_node
+	uint32_t desc; // 序号,等于BpBinder.mhandle
+	int strong; // 强引用计数
+	int weak;  // 弱引用计数
+	struct binder_ref_death *death; // Binder死亡通知
 };
 ```
 
@@ -508,9 +511,10 @@ struct flat_binder_object {
 	unsigned long		flags; // BINDER_TYPE_BINDER、BINDER_TYPE_WEAK_BINDER才有意义
 
 	/* 8 bytes of data. */
+    // 注意这两个是互斥的
 	union {
-		void		*binder;	/* local object */
-		signed long	handle;		/* remote object */
+		void		*binder;	/* local object */ 本地对象
+		signed long	handle;		/* remote object */ 远程对象,一个句柄
 	};
 
 	/* extra data associated with local object */
@@ -545,6 +549,98 @@ enum {
 ```
 
 
+
+## Binder协议
+
+Binder协议可以分为两种：`控制协议`和`驱动协议`。
+
+控制协议是进程通过ioctl（“/dev/binder”）与Binder设备进行通信的协议。该协议包含以下命令：
+
+| command                  | Description                                             | Parameter Type    |
+| :----------------------- | :------------------------------------------------------ | :---------------- |
+| BINDER_WRITE_READ        | 读写操作，最常用的命令。IPC过程就是通过这个命令传输数据 | binder_write_read |
+| BINDER_SET_MAX_THREADS   | 设置进程支持的最大线程数                                | size_t            |
+| BINDER_SET_CONTEXT_MGR   | 将自己设置为 ServiceManage                              | no                |
+| BINDER_THREAD_EXIT       | 通知驱动Binder线程退出                                  | no                |
+| BINDER_VERSION           | 获取Binder驱动的版本号                                  | binder_version    |
+| BINDER_SET_IDLE_PRIORITY | 还没使用                                                | -                 |
+| BINDER_SET_IDLE_TIMEOUT  | 还没使用                                                | -                 |
+
+drivers\staging\android\binder.h
+
+```c#
+#define BINDER_WRITE_READ   		_IOWR('b', 1, struct binder_write_read)
+#define	BINDER_SET_IDLE_TIMEOUT		_IOW('b', 3, int64_t)
+#define	BINDER_SET_MAX_THREADS		_IOW('b', 5, size_t)
+#define	BINDER_SET_IDLE_PRIORITY	_IOW('b', 6, int)
+#define	BINDER_SET_CONTEXT_MGR		_IOW('b', 7, int)
+#define	BINDER_THREAD_EXIT		_IOW('b', 8, int)
+#define BINDER_VERSION			_IOWR('b', 9, struct binder_version)
+```
+
+Binder驱动协议描述了使用Binder驱动的具体过程。驱动协议可以分为两类：
+
+- binder_driver_command_protocol  描述进程发送给Binder驱动的命令
+- binder_driver_return_protocol 描述Binder驱动发送给进程的命令
+
+binder_driver_command_protocol
+
+一共包含17条命令，分别是：
+
+| command                       | Description                                                  | Parameter Type          |
+| :---------------------------- | :----------------------------------------------------------- | :---------------------- |
+| BC_TRANSACTION                | Binder transaction, namely: Client's request for Server      | binder_transaction_data |
+| BC_REPLY                      | The response of the transaction, namely: Server's response to Client | binder_transaction_data |
+| BC_FREE_BUFFER                | Notify the driver to release the buffer                      | binder_uintptr_t        |
+| BC_ACQUIRE                    | Strong reference count +1                                    | __u32                   |
+| BC_RELEASE                    | Strong reference count -1                                    | __u32                   |
+| BC_INCREFS                    | Weak reference count +1                                      | __u32                   |
+| BC_DECREFS                    | Weak reference count -1                                      | __u32                   |
+| BC_ACQUIRE_DONE               | BR_ACQUIRE's reply                                           | binder_ptr_cookie       |
+| BC_INCREFS_DONE               | Reply from BR_INCREFS                                        | binder_ptr_cookie       |
+| BC_ENTER_LOOPER               | Notify the driver that the main thread is ready              | void                    |
+| BC_REGISTER_LOOPER            | Notify the driver that the child thread is ready             | void                    |
+| BC_EXIT_LOOPER                | Notify the driver that the thread has exited                 | void                    |
+| BC_REQUEST_DEATH_NOTIFICATION | Request death notification                                   | binder_handle_cookie    |
+| BC_CLEAR_DEATH_NOTIFICATION   | Remove receiving death notifications                         | binder_handle_cookie    |
+| BC_DEAD_BINDER_DONE           | Death notice has been processed                              | binder_uintptr_t        |
+| BC_ATTEMPT_ACQUIRE            | Not yet implemented                                          | -                       |
+| BC_ACQUIRE_RESULT             | Not yet implemented                                          |                         |
+
+
+
+binder_driver_return_protocol
+
+一共包含18条命令，分别是：
+
+| Return type                      | Description                                                  | Parameter Type          |
+| :------------------------------- | :----------------------------------------------------------- | :---------------------- |
+| BR_OK                            | Operation complete                                           | void                    |
+| BR_NOOP                          | Operation complete                                           | void                    |
+| BR_ERROR                         | An error occurred                                            | __s32                   |
+| BR_TRANSACTION                   | The notification process received a Binder request (Server side) | binder_transaction_data |
+| BR_REPLY                         | The notification process receives a response to the Binder request (Client) | binder_transaction_data |
+| BR_TRANSACTION_COMPLETE          | Driver's confirmation response to accept the request         | void                    |
+| BR_FAILED_REPLY                  | Inform the sender that the communication target does not exist | void                    |
+| BR_SPAWN_LOOPER                  | Notify the Binder process to create a new thread             | void                    |
+| BR_ACQUIRE                       | Strong reference count +1 request                            | binder_ptr_cookie       |
+| BR_RELEASE                       | Strong reference count-1 request                             | binder_ptr_cookie       |
+| BR_INCREFS                       | Weak reference count +1 request                              | binder_ptr_cookie       |
+| BR_DECREFS                       | If reference count -1 request                                | binder_ptr_cookie       |
+| BR_DEAD_BINDER                   | Send death notice                                            | binder_uintptr_t        |
+| BR_CLEAR_DEATH_NOTIFICATION_DONE | Clear death notification completed                           | binder_uintptr_t        |
+| BR_DEAD_REPLY                    | Inform the sender that the other party is dead               | void                    |
+| BR_ACQUIRE_RESULT                | Not yet implemented                                          | -                       |
+| BR_ATTEMPT_ACQUIRE               | Not yet implemented                                          | -                       |
+| BR_FINISHED                      | Not yet implemented                                          | -                       |
+
+![](./img/binder_request_sequence.png)
+
+- Binder是C/S架构，通信过程涉及三个角色：Client、Server和Binder驱动
+- Client对Server的请求和Server对Client的响应都需要Binder驱动才能传输数据
+- BC_XXX命令是进程发送给驱动的命令
+- BR_XXX 命令是驱动程序发送给进程的命令
+- 整个通信过程由Binder驱动和控制
 
 ## BinderDriverCommandProtocol
 
@@ -687,3 +783,10 @@ struct binder_object
 };
 ```
 
+
+
+
+
+参考：
+
+https://blog.katastros.com/a?ID=00550-3b0a77ca-c82c-49f0-952c-e42ca07e452b
