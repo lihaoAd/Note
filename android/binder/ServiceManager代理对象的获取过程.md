@@ -1,15 +1,10 @@
-## 源码路径
+## defaultServiceManager
 
-```c
-frameworks\base\include\utils\RefBase.h
-frameworks\base\libs\utils\RefBase.cpp
-frameworks\base\libs\binder\IInterface.cpp
-frameworks\base\include\binder\IBinder.h   
-frameworks\base\libs\binder\Binder.cpp
-frameworks\base\include\binder\BpBinder.h
-frameworks\base\include\binder\IServiceManager.h  
-frameworks\base\libs\binder\IServiceManager.cpp   
-```
+以下描述`client`进程获取`ServiceManager`的代理的过程，`client`获取service代理对象的过程中就表示想要与binder驱动通信，就会open Binder设备，映射`1M - 8K`大小的空间
+
+，设置最大的binder线程数15。
+
+![image-20220427215638530](img/image-20220427215638530.png)
 
 ![](img/Service Manager代理对象类图.jpg)
 
@@ -34,7 +29,7 @@ sp<IServiceManager> defaultServiceManager()
 }
 ```
 
-
+## ProcessState::self()
 
 frameworks\base\libs\binder\ProcessState.cpp
 
@@ -161,6 +156,8 @@ static int open_driver()
 
 调用完`open_driver`后，会在内核中生成该进程的`binder_proc`结构，用来描述该进程，再执行`mmap`后，映射了设备，分配了内核缓冲区，缓冲区的起始地址放在`mVMStart`中。
 
+## getContextObject
+
 ```c
 sp<IBinder> ProcessState::getContextObject(const sp<IBinder>& caller)
 {
@@ -200,7 +197,7 @@ wp<IBinder> ProcessState::getWeakProxyForHandle(int32_t handle)
 
     AutoMutex _l(mLock);
 
-    handle_entry* e = lookupHandleLocked(handle);s
+    handle_entry* e = lookupHandleLocked(handle);
 
     if (e != NULL) {        
         // We need to create a new BpBinder if there isn't currently one, OR we
@@ -215,7 +212,7 @@ wp<IBinder> ProcessState::getWeakProxyForHandle(int32_t handle)
             b = new BpBinder(handle);
             result = b;
             e->binder = b;
-            if (b) e->refs = b->getWeakRefs();
+                if (b) e->refs = b->getWeakRefs();
         } else {
             result = b;
             e->refs->decWeak(this);
@@ -268,6 +265,8 @@ ProcessState::handle_entry* ProcessState::lookupHandleLocked(int32_t handle)
 
 ![image-20220409113459503](./img/image-20220409113459503.png)
 
+## interface_cast
+
 
 
 ```c
@@ -306,6 +305,10 @@ virtual ~IServiceManager();
 
 
 
+## asInterface
+
+
+
 ```c
 IMPLEMENT_META_INTERFACE(ServiceManager, "android.os.IServiceManager");
 ```
@@ -335,7 +338,7 @@ IMPLEMENT_META_INTERFACE(ServiceManager, "android.os.IServiceManager");
     I##INTERFACE::~I##INTERFACE() { }                                   \
 ```
 
-```c
+```c++
 const android::String16 IServiceManager:descriptor("android.os.IServiceManager");            
 const android::String16& IServiceManager::getInterfaceDescriptor() const 
 {              
@@ -345,7 +348,11 @@ android::sp<IServiceManager> IServiceManager::asInterface(const android::sp<andr
 {   
     	// obj就是BpBinder
         android::sp<IServiceManager> intr;                                 
-        if (obj != NULL) {                                              
+        if (obj != NULL) {        
+            
+            // obj是一个智能指针，重写了-> 运算符，语句 p->m 被解释为 (p.operator->())->m
+            // obj->queryLocalInterface(IServiceManager::descriptor) 返回一个另一个sp，只不过这个sp内部的m_ptr 是NULL
+            // 所以调用get时返回了NULL
             intr = static_cast<IServiceManager*>(obj->queryLocalInterface(IServiceManager::descriptor).get());               
             if (intr == NULL) {                                         
                 intr = new BpServiceManager(obj);                          
@@ -382,4 +389,81 @@ sp<IInterface>  IBinder::queryLocalInterface(const String16& descriptor)
 `BpBinder`的`queryLocalInterface`返方法返返回的是NULL，那么`asInterface`返回的就是`BpServiceManager`
 
 
+
+frameworks\base\libs\binder\IServiceManager.cpp
+
+```c++
+class BpServiceManager : public BpInterface<IServiceManager>
+{
+public:
+    BpServiceManager(const sp<IBinder>& impl)
+        : BpInterface<IServiceManager>(impl)
+    {
+    }
+
+    virtual sp<IBinder> getService(const String16& name) const
+    {
+        unsigned n;
+        for (n = 0; n < 5; n++){
+            sp<IBinder> svc = checkService(name);
+            if (svc != NULL) return svc;
+            LOGI("Waiting for service %s...\n", String8(name).string());
+            sleep(1);
+        }
+        return NULL;
+    }
+
+    virtual sp<IBinder> checkService( const String16& name) const
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IServiceManager::getInterfaceDescriptor());
+        data.writeString16(name);
+        remote()->transact(CHECK_SERVICE_TRANSACTION, data, &reply);
+        return reply.readStrongBinder();
+    }
+
+    virtual status_t addService(const String16& name, const sp<IBinder>& service)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IServiceManager::getInterfaceDescriptor());
+        data.writeString16(name);
+        data.writeStrongBinder(service);
+        status_t err = remote()->transact(ADD_SERVICE_TRANSACTION, data, &reply);
+        return err == NO_ERROR ? reply.readExceptionCode() : err;
+    }
+
+    virtual Vector<String16> listServices()
+    {
+        Vector<String16> res;
+        int n = 0;
+
+        for (;;) {
+            Parcel data, reply;
+            data.writeInterfaceToken(IServiceManager::getInterfaceDescriptor());
+            data.writeInt32(n++);
+            status_t err = remote()->transact(LIST_SERVICES_TRANSACTION, data, &reply);
+            if (err != NO_ERROR)
+                break;
+            res.add(reply.readString16());
+        }
+        return res;
+    }
+};
+```
+
+
+
+frameworks\base\include\binder\IInterface.h
+
+```c++
+template<typename INTERFACE>
+class BpInterface : public INTERFACE, public BpRefBase
+{
+public:
+                                BpInterface(const sp<IBinder>& remote);
+
+protected:
+    virtual IBinder*            onAsBinder();
+};
+```
 
