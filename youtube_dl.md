@@ -1,3 +1,21 @@
+## clone
+
+```jade
+git clone https://github.com/ytdl-org/youtube-dl.git
+```
+
+
+
+## install 
+
+```
+cd youtube-dl/bin
+
+python -m pip install --upgrade youtube-dl
+```
+
+
+
 ## 视频所有类型,只看不下载
 
 ````
@@ -29,3 +47,12 @@ youtube-dl -f [format code] [url]
 
 
 ![image-20210202142223321](./img/image-20210202142223321.png)
+
+## 如何仅从播放列表下载新视频？
+
+```
+cd youtube-dl/bin
+
+python youtube-dl --download-archive archive.txt "https://www.youtube.com/playlist?list=PLwiyx1dc3P2JR9N8gQaQN_BCvlSlap7re"
+```
+

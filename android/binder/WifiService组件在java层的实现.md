@@ -66,9 +66,14 @@ frameworks\base\core\java\android\os\Binder.java
 ```java
 public class Binder implements IBinder {
 
+    // c++层 JavaBBinderHolder的指针地址
     private int mObject;
+    
+    // 实现了IInterface的 IWifiManager.Stub对象
     private IInterface mOwner;   
-    private String mDescriptor;  // android.net.wifi.IWifiManager
+    
+    // android.net.wifi.IWifiManager
+    private String mDescriptor;  
     
     public Binder() {
         // 会在JNI层构造JavaBBinderHolder对象
@@ -358,6 +363,7 @@ protected:
 
 private:
     JavaVM* const   mVM;
+    // 对应java层Service对象
     jobject const   mObject;
 };
 ```
@@ -661,6 +667,9 @@ static jboolean android_os_BinderProxy_transact(JNIEnv* env, jobject obj,
     
     // 调用BpBinder的transact方法
     status_t err = target->transact(code, *data, reply, flags);
+    
+    
+    
     //if (reply) printf("Transact from Java code to %p received: ", target); reply->print();
     if (time_binder_calls) {
         conditionally_log_binder_call(start_millis, target, code);
@@ -754,6 +763,7 @@ frameworks\base\libs\binder\IPCThreadState.cpp
 status_t IPCThreadState::writeTransactionData(int32_t cmd, uint32_t binderFlags,
     int32_t handle, uint32_t code, const Parcel& data, status_t* statusBuffer)
 {
+    // 先将数据转换为binder_transaction_data结构数据
     binder_transaction_data tr;
 
     // 此时我们正想和serviceManager通信。所以handle为0
@@ -822,6 +832,7 @@ drivers\staging\android\binder.h
 frameworks\base\libs\binder\IPCThreadState.cpp
 
 ```c++
+// 头文件中已经定义doReceive默认参数为true
 status_t IPCThreadState::talkWithDriver(bool doReceive)
 {
     
@@ -985,6 +996,8 @@ err:
 }
 ```
 
+### binder_thread_write
+
 
 
 drivers\staging\android\binder.c
@@ -1001,7 +1014,7 @@ binder_thread_write(struct binder_proc *proc, struct binder_thread *thread, void
 	while (ptr < end && thread->return_error == BR_OK) {
 		if (get_user(cmd, (uint32_t __user *)ptr))
 			return -EFAULT;
-        // 读取到cmd后，指针移动sizeof(uint32_t)大小，为了读取后面的
+        // 读取到cmd后，指针移动sizeof(uint32_t)大小，为了读取后面的 binder_transaction_data 
 		ptr += sizeof(uint32_t);
 		...
 		switch (cmd) {
@@ -1013,7 +1026,10 @@ binder_thread_write(struct binder_proc *proc, struct binder_thread *thread, void
 
 			if (copy_from_user(&tr, ptr, sizeof(tr)))
 				return -EFAULT;
+            
+            // 指针跳过 binder_transaction_data ，指向下个 cmd
 			ptr += sizeof(tr);
+            
 			binder_transaction(proc, thread, &tr, cmd == BC_REPLY);
 			break;
 		}
@@ -1079,7 +1095,8 @@ binder_transaction(struct binder_proc *proc, struct binder_thread *thread,struct
         // TF_ONE_WAY位为1，就表示需要异步传输，不需要等待回复数据
         // transaction_stack不为null表示该线程正在等待其他线程的返回
         // thread是wifiService进程的线程
-        // 这里实在找该thread依赖的事务有没有serviceManager binder线程
+        // 这里是在找该thread依赖的事务有没有serviceManager binder线程
+        // 如果是同步请求，尝试寻找一个在等待其他事物执行的线程，这是一种优化调度
 		if (!(tr->flags & TF_ONE_WAY) && thread->transaction_stack) {
 			struct binder_transaction *tmp;
 			tmp = thread->transaction_stack;
@@ -1168,6 +1185,7 @@ drivers\staging\android\binder.c
 	offp = (size_t *)(t->buffer->data + ALIGN(tr->data_size, sizeof(void *)));
 
    
+	// binder_transaction_data
  	// 将用户空间tr->data.ptr.buffer 的数据拷贝到t->buffer->data，数据大小为tr->data_size
 	if (copy_from_user(t->buffer->data, tr->data.ptr.buffer, tr->data_size)) {
 		binder_user_error("binder: %d:%d got transaction with invalid "
@@ -1191,8 +1209,8 @@ drivers\staging\android\binder.c
 		return_error = BR_FAILED_REPLY;
 		goto err_bad_offset;
 	}
-	
-	// 
+	 
+	// 偏移数组结束的位置，里面保存的是 flat_binder_object
 	off_end = (void *)offp + tr->offsets_size;
 ```
 
@@ -1200,6 +1218,7 @@ drivers\staging\android\binder.c
 
 ```c++
 	// 处理通信数据中的binder对象
+	// 偏移数组中可能有多个flat_binder_object，所以for循环检查
 	for (; offp < off_end; offp++) {
 		struct flat_binder_object *fp;
 		if (*offp > t->buffer->data_size - sizeof(*fp) ||
@@ -1211,15 +1230,24 @@ drivers\staging\android\binder.c
 			return_error = BR_FAILED_REPLY;
 			goto err_bad_offset;
 		}
-        // offp中存的是偏移地址
+        // offp中存的是偏移地址，加上起始地址 t->buffer->data 就知道flat_binder_object真实地址
 		fp = (struct flat_binder_object *)(t->buffer->data + *offp);
+        
 		switch (fp->type) {
 		case BINDER_TYPE_BINDER:
 		case BINDER_TYPE_WEAK_BINDER: {
 			struct binder_ref *ref;
+            
+            // 现在研究的是注册wifiService，那么这个fp->binder就是 JavaBBinder对象的弱引用地址
+            // 第一次，node为NULL
 			struct binder_node *node = binder_get_node(proc, fp->binder);
 			if (node == NULL) {
+                
+                // 新创建一个，注意现在研究的是注册wifiService
+                //  fp->binder的值是JavaBBinder对象的弱引用地址
+                //  fp->cookie就是JavaBBinder对象
 				node = binder_new_node(proc, fp->binder, fp->cookie);
+                
 				if (node == NULL) {
 					return_error = BR_FAILED_REPLY;
 					goto err_binder_new_node_failed;
@@ -1235,18 +1263,26 @@ drivers\staging\android\binder.c
 					fp->cookie, node->cookie);
 				goto err_binder_get_ref_for_node_failed;
 			}
+            
+            // 创建一个binder引用对象
 			ref = binder_get_ref_for_node(target_proc, node);
 			if (ref == NULL) {
 				return_error = BR_FAILED_REPLY;
 				goto err_binder_get_ref_for_node_failed;
 			}
+            
+            // 注意type类型的变化
 			if (fp->type == BINDER_TYPE_BINDER)
 				fp->type = BINDER_TYPE_HANDLE;
 			else
 				fp->type = BINDER_TYPE_WEAK_HANDLE;
+            
+            // 现在我们想找ServiceManager,ref->desc值为0
 			fp->handle = ref->desc;
+            
 			binder_inc_ref(ref, fp->type == BINDER_TYPE_HANDLE, &thread->todo);
-			if (binder_debug_mask & BINDER_DEBUG_TRANSACTION)
+			
+            if (binder_debug_mask & BINDER_DEBUG_TRANSACTION)
 				printk(KERN_INFO "        node %d u%p -> ref %d desc %d\n",
 				       node->debug_id, node->ptr, ref->debug_id, ref->desc);
 		} break;
@@ -1263,8 +1299,11 @@ drivers\staging\android\binder.c
 		...
 	} else if (!(t->flags & TF_ONE_WAY)) {
 		BUG_ON(t->buffer->async_transaction != 0);
+        // 同步事务，需要回复
 		t->need_reply = 1;
+        // t是我们刚刚创建的binder_transaction，
 		t->from_parent = thread->transaction_stack;
+        // 将事务压入到源线程的transaction_stack中
 		thread->transaction_stack = t;
 	} else {
 		BUG_ON(target_node == NULL);
@@ -1275,11 +1314,19 @@ drivers\staging\android\binder.c
 		} else
 			target_node->has_async_transaction = 1;
 	}
+
+	// 事务类型 BINDER_WORK_TRANSACTION
 	t->work.type = BINDER_WORK_TRANSACTION;
+	//添加到目标进程或者目标线程的工作队列中
 	list_add_tail(&t->work.entry, target_list);
+	
+	// 将一个工作项binder_work添加到源线程的工作队列中
+	// 函数结束后，源线程中的todo列表中就会有任务
 	tcomplete->type = BINDER_WORK_TRANSACTION_COMPLETE;
 	list_add_tail(&tcomplete->entry, &thread->todo);
+
 	if (target_wait)
+        // 唤醒目标进程或者目标线程，有个BINDER_WORK_TRANSACTION事务
 		wake_up_interruptible(target_wait);
 	return;
 
@@ -1287,6 +1334,309 @@ drivers\staging\android\binder.c
 ```
 
 
+
+### binder_thread_read
+
+drivers\staging\android\binder.c
+
+```c++
+static int
+binder_thread_read(struct binder_proc *proc, struct binder_thread *thread,void  __user *buffer, int size, signed long *consumed, int non_block)
+{
+	void __user *ptr = buffer + *consumed;
+	void __user *end = buffer + size;
+
+	int ret = 0;
+	int wait_for_proc_work;
+
+	if (*consumed == 0) {
+		if (put_user(BR_NOOP, (uint32_t __user *)ptr))
+			return -EFAULT;
+		ptr += sizeof(uint32_t);
+	}
+
+retry:
+    // 线程是否已经把事情都做完了
+	wait_for_proc_work = thread->transaction_stack == NULL && list_empty(&thread->todo);
+
+	if (thread->return_error != BR_OK && ptr < end) {
+		if (thread->return_error2 != BR_OK) {
+			if (put_user(thread->return_error2, (uint32_t __user *)ptr))
+				return -EFAULT;
+			ptr += sizeof(uint32_t);
+			if (ptr == end)
+				goto done;
+			thread->return_error2 = BR_OK;
+		}
+		if (put_user(thread->return_error, (uint32_t __user *)ptr))
+			return -EFAULT;
+		ptr += sizeof(uint32_t);
+		thread->return_error = BR_OK;
+		goto done;
+	}
+
+
+	thread->looper |= BINDER_LOOPER_STATE_WAITING;
+	if (wait_for_proc_work)
+        // 又一个线程空闲了，增加计数
+		proc->ready_threads++;
+    
+	mutex_unlock(&binder_lock);
+	if (wait_for_proc_work) {
+		if (!(thread->looper & (BINDER_LOOPER_STATE_REGISTERED |
+					BINDER_LOOPER_STATE_ENTERED))) {
+			binder_user_error("binder: %d:%d ERROR: Thread waiting "
+				"for process work before calling BC_REGISTER_"
+				"LOOPER or BC_ENTER_LOOPER (state %x)\n",
+				proc->pid, thread->pid, thread->looper);
+			wait_event_interruptible(binder_user_error_wait, binder_stop_on_user_error < 2);
+		}
+		binder_set_nice(proc->default_priority);
+		if (non_block) {
+			if (!binder_has_proc_work(proc, thread))
+				ret = -EAGAIN;
+		} else
+			ret = wait_event_interruptible_exclusive(proc->wait, binder_has_proc_work(proc, thread));
+	} else {
+		if (non_block) {
+			if (!binder_has_thread_work(thread))
+				ret = -EAGAIN;
+		} else
+			ret = wait_event_interruptible(thread->wait, binder_has_thread_work(thread));
+	}
+	mutex_lock(&binder_lock);
+	if (wait_for_proc_work)
+        // 线程有活干了，减少计数
+		proc->ready_threads--;
+	thread->looper &= ~BINDER_LOOPER_STATE_WAITING;
+
+	if (ret)
+		return ret;
+
+	while (1) {
+		uint32_t cmd;
+		struct binder_transaction_data tr;
+		struct binder_work *w;
+		struct binder_transaction *t = NULL;
+
+        // 我们刚刚往源线程的todo队列中放了一个 BINDER_WORK_TRANSACTION_COMPLETE 类型的binder_work
+		if (!list_empty(&thread->todo))
+			w = list_first_entry(&thread->todo, struct binder_work, entry);
+		else if (!list_empty(&proc->todo) && wait_for_proc_work)
+			w = list_first_entry(&proc->todo, struct binder_work, entry);
+		else {
+			if (ptr - buffer == 4 && !(thread->looper & BINDER_LOOPER_STATE_NEED_RETURN)) /* no data added */
+				goto retry;
+			break;
+		}
+
+		if (end - ptr < sizeof(tr) + 4)
+			break;
+
+		switch (w->type) {
+		case BINDER_WORK_TRANSACTION: {
+			t = container_of(w, struct binder_transaction, work);
+		} break;
+		case BINDER_WORK_TRANSACTION_COMPLETE: {
+			cmd = BR_TRANSACTION_COMPLETE;
+            
+            // 把 BR_TRANSACTION_COMPLETE 放进用户空间的缓冲区中
+			if (put_user(cmd, (uint32_t __user *)ptr))
+				return -EFAULT;
+			ptr += sizeof(uint32_t);
+
+			binder_stat_br(proc, thread, cmd);
+			if (binder_debug_mask & BINDER_DEBUG_TRANSACTION_COMPLETE)
+				printk(KERN_INFO "binder: %d:%d BR_TRANSACTION_COMPLETE\n",
+				       proc->pid, thread->pid);
+			// 
+			list_del(&w->entry);
+			kfree(w);
+			binder_stats.obj_deleted[BINDER_STAT_TRANSACTION_COMPLETE]++;
+		} break;
+		case BINDER_WORK_NODE: {
+			struct binder_node *node = container_of(w, struct binder_node, work);
+			uint32_t cmd = BR_NOOP;
+			const char *cmd_name;
+			int strong = node->internal_strong_refs || node->local_strong_refs;
+			int weak = !hlist_empty(&node->refs) || node->local_weak_refs || strong;
+			if (weak && !node->has_weak_ref) {
+				cmd = BR_INCREFS;
+				cmd_name = "BR_INCREFS";
+				node->has_weak_ref = 1;
+				node->pending_weak_ref = 1;
+				node->local_weak_refs++;
+			} else if (strong && !node->has_strong_ref) {
+				cmd = BR_ACQUIRE;
+				cmd_name = "BR_ACQUIRE";
+				node->has_strong_ref = 1;
+				node->pending_strong_ref = 1;
+				node->local_strong_refs++;
+			} else if (!strong && node->has_strong_ref) {
+				cmd = BR_RELEASE;
+				cmd_name = "BR_RELEASE";
+				node->has_strong_ref = 0;
+			} else if (!weak && node->has_weak_ref) {
+				cmd = BR_DECREFS;
+				cmd_name = "BR_DECREFS";
+				node->has_weak_ref = 0;
+			}
+			if (cmd != BR_NOOP) {
+				if (put_user(cmd, (uint32_t __user *)ptr))
+					return -EFAULT;
+				ptr += sizeof(uint32_t);
+				if (put_user(node->ptr, (void * __user *)ptr))
+					return -EFAULT;
+				ptr += sizeof(void *);
+				if (put_user(node->cookie, (void * __user *)ptr))
+					return -EFAULT;
+				ptr += sizeof(void *);
+
+				binder_stat_br(proc, thread, cmd);
+				if (binder_debug_mask & BINDER_DEBUG_USER_REFS)
+					printk(KERN_INFO "binder: %d:%d %s %d u%p c%p\n",
+					       proc->pid, thread->pid, cmd_name, node->debug_id, node->ptr, node->cookie);
+			} else {
+				list_del_init(&w->entry);
+				if (!weak && !strong) {
+					if (binder_debug_mask & BINDER_DEBUG_INTERNAL_REFS)
+						printk(KERN_INFO "binder: %d:%d node %d u%p c%p deleted\n",
+						       proc->pid, thread->pid, node->debug_id, node->ptr, node->cookie);
+					rb_erase(&node->rb_node, &proc->nodes);
+					kfree(node);
+					binder_stats.obj_deleted[BINDER_STAT_NODE]++;
+				} else {
+					if (binder_debug_mask & BINDER_DEBUG_INTERNAL_REFS)
+						printk(KERN_INFO "binder: %d:%d node %d u%p c%p state unchanged\n",
+						       proc->pid, thread->pid, node->debug_id, node->ptr, node->cookie);
+				}
+			}
+		} break;
+		case BINDER_WORK_DEAD_BINDER:
+		case BINDER_WORK_DEAD_BINDER_AND_CLEAR:
+		case BINDER_WORK_CLEAR_DEATH_NOTIFICATION: {
+			struct binder_ref_death *death = container_of(w, struct binder_ref_death, work);
+			uint32_t cmd;
+			if (w->type == BINDER_WORK_CLEAR_DEATH_NOTIFICATION)
+				cmd = BR_CLEAR_DEATH_NOTIFICATION_DONE;
+			else
+				cmd = BR_DEAD_BINDER;
+			if (put_user(cmd, (uint32_t __user *)ptr))
+				return -EFAULT;
+			ptr += sizeof(uint32_t);
+			if (put_user(death->cookie, (void * __user *)ptr))
+				return -EFAULT;
+			ptr += sizeof(void *);
+			if (binder_debug_mask & BINDER_DEBUG_DEATH_NOTIFICATION)
+				printk(KERN_INFO "binder: %d:%d %s %p\n",
+				       proc->pid, thread->pid,
+				       cmd == BR_DEAD_BINDER ?
+				       "BR_DEAD_BINDER" :
+				       "BR_CLEAR_DEATH_NOTIFICATION_DONE",
+				       death->cookie);
+
+			if (w->type == BINDER_WORK_CLEAR_DEATH_NOTIFICATION) {
+				list_del(&w->entry);
+				kfree(death);
+				binder_stats.obj_deleted[BINDER_STAT_DEATH]++;
+			} else
+				list_move(&w->entry, &proc->delivered_death);
+			if (cmd == BR_DEAD_BINDER)
+				goto done; /* DEAD_BINDER notifications can cause transactions */
+		} break;
+		}
+
+        
+        
+        // 当binder_work的类型是BINDER_WORK_TRANSACTION时，t不为NULL
+		if (!t)
+			continue;
+
+		BUG_ON(t->buffer == NULL);
+		if (t->buffer->target_node) {
+			struct binder_node *target_node = t->buffer->target_node;
+			tr.target.ptr = target_node->ptr;
+			tr.cookie =  target_node->cookie;
+			t->saved_priority = task_nice(current);
+			if (t->priority < target_node->min_priority &&
+			    !(t->flags & TF_ONE_WAY))
+				binder_set_nice(t->priority);
+			else if (!(t->flags & TF_ONE_WAY) ||
+				 t->saved_priority > target_node->min_priority)
+				binder_set_nice(target_node->min_priority);
+			cmd = BR_TRANSACTION;
+		} else {
+			tr.target.ptr = NULL;
+			tr.cookie = NULL;
+			cmd = BR_REPLY;
+		}
+		tr.code = t->code;
+		tr.flags = t->flags;
+		tr.sender_euid = t->sender_euid;
+
+		if (t->from) {
+			struct task_struct *sender = t->from->proc->tsk;
+			tr.sender_pid = task_tgid_nr_ns(sender, current->nsproxy->pid_ns);
+		} else {
+			tr.sender_pid = 0;
+		}
+
+		tr.data_size = t->buffer->data_size;
+		tr.offsets_size = t->buffer->offsets_size;
+		tr.data.ptr.buffer = (void *)t->buffer->data + proc->user_buffer_offset;
+		tr.data.ptr.offsets = tr.data.ptr.buffer + ALIGN(t->buffer->data_size, sizeof(void *));
+
+		if (put_user(cmd, (uint32_t __user *)ptr))
+			return -EFAULT;
+		ptr += sizeof(uint32_t);
+		if (copy_to_user(ptr, &tr, sizeof(tr)))
+			return -EFAULT;
+		ptr += sizeof(tr);
+
+		binder_stat_br(proc, thread, cmd);
+		if (binder_debug_mask & BINDER_DEBUG_TRANSACTION)
+			printk(KERN_INFO "binder: %d:%d %s %d %d:%d, cmd %d"
+				"size %zd-%zd ptr %p-%p\n",
+			       proc->pid, thread->pid,
+			       (cmd == BR_TRANSACTION) ? "BR_TRANSACTION" : "BR_REPLY",
+			       t->debug_id, t->from ? t->from->proc->pid : 0,
+			       t->from ? t->from->pid : 0, cmd,
+			       t->buffer->data_size, t->buffer->offsets_size,
+			       tr.data.ptr.buffer, tr.data.ptr.offsets);
+
+		list_del(&t->work.entry);
+		t->buffer->allow_user_free = 1;
+		if (cmd == BR_TRANSACTION && !(t->flags & TF_ONE_WAY)) {
+			t->to_parent = thread->transaction_stack;
+			t->to_thread = thread;
+			thread->transaction_stack = t;
+		} else {
+			t->buffer->transaction = NULL;
+			kfree(t);
+			binder_stats.obj_deleted[BINDER_STAT_TRANSACTION]++;
+		}
+		break;
+	}
+
+done:
+
+    // 发送给用户态的字节数
+	*consumed = ptr - buffer;
+	if (proc->requested_threads + proc->ready_threads == 0 &&
+	    proc->requested_threads_started < proc->max_threads &&
+	    (thread->looper & (BINDER_LOOPER_STATE_REGISTERED |
+	     BINDER_LOOPER_STATE_ENTERED)) /* the user-space code fails to */
+	     /*spawn a new thread if we leave this out */) {
+		proc->requested_threads++;
+		if (binder_debug_mask & BINDER_DEBUG_THREADS)
+			printk(KERN_INFO "binder: %d:%d BR_SPAWN_LOOPER\n",
+			       proc->pid, thread->pid);
+		if (put_user(BR_SPAWN_LOOPER, (uint32_t __user *)buffer))
+			return -EFAULT;
+	}
+	return 0;
+}
+```
 
 
 

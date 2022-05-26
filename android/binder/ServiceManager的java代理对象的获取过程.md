@@ -1,4 +1,4 @@
-
+![image-20220428235023550](img./image-20220428235023550.png)
 
 ![](img/ServiceManager的java代理对象的获取过程.jpg)
 
@@ -400,36 +400,6 @@ class ObjectManager
 
 ![image-20220404111517359](./img/image-20220404111517359.png)
 
-frameworks\base\core\java\android\os\ServiceManagerNative.java
-
-```java
-// 现在我们获取的是ServiceManager,所以这个obj就是BinderProxy 
-static public IServiceManager asInterface(IBinder obj)
-{
-        if (obj == null) {
-            return null;
-        }
-         // BinderProxy的queryLocalInterface返回的是null
-        IServiceManager in = (IServiceManager)obj.queryLocalInterface(descriptor);
-        if (in != null) {
-            return in;
-        }
-        
-        return new ServiceManagerProxy(obj);
-    }
-```
-
-frameworks\base\core\java\android\os\Binder.java
-
-```java
-final class BinderProxy implements IBinder {
-
-	 public IInterface queryLocalInterface(String descriptor) {
-        return null;
-    }
-}
-```
-
 
 
 frameworks\base\libs\binder\BpBinder.cpp
@@ -453,7 +423,7 @@ static public IServiceManager asInterface(IBinder obj)
         if (obj == null) {
             return null;
         }
-    	// 这个obj就是BpBinderProxy对象,而BpBinderProxy对象的queryLocalInterface返回的是null
+    	// 这个obj就是BinderProxy对象,而BinderProxy对象的queryLocalInterface返回的是null
         IServiceManager in = (IServiceManager)obj.queryLocalInterface(descriptor);
         if (in != null) {
             return in;

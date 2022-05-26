@@ -54,17 +54,17 @@ a与b不匹配，匹配串每次移动一个位置，简称滑动，已经明知
 
 前缀：a、ab、aba、abab、ababa、ababab
 
-后缀：a、ba、aba、baba、ababa、bababa
+后缀：b、ba、bab、baba、babab、bababa
 
 
 
-加入有这样的一个主串T : babaabababada，匹配串是P : abababa
+假如有这样的一个主串T : babaabababada，匹配串是P : abababa
 
 
 
 <img src="img/image-20210620092138523.png" alt="image-20210620092138523" style="zoom:50%;" />
 
-​		首先T[0]与P[0]不匹配，并且下一个T[1]与P[1]是匹配的，按照人类的想法，就是把P向右移动一位。
+​		首先T[0]与P[0]不匹配，并且下一个T[1]与P[0]是匹配的，按照人类的想法，就是把P向右移动一位。
 
 <img src="img/image-20210620092226176.png" alt="image-20210620092226176" style="zoom:50%;" />
 
@@ -135,7 +135,7 @@ ababab
 
 ....
 
-如何写好这个逻辑的代码？需要找规律，其实就2钟：
+如何写好这个逻辑的代码？需要找规律，其实就2种：
 
 1. P[j + 1 ] == P[next[j]]
 
