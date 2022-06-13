@@ -54,7 +54,7 @@ a与b不匹配，匹配串每次移动一个位置，简称滑动，已经明知
 
 前缀：a、ab、aba、abab、ababa、ababab
 
-后缀：b、ba、bab、baba、babab、bababa
+后缀：a、ba、aba、baba、ababa、bababa
 
 
 
@@ -64,7 +64,7 @@ a与b不匹配，匹配串每次移动一个位置，简称滑动，已经明知
 
 <img src="img/image-20210620092138523.png" alt="image-20210620092138523" style="zoom:50%;" />
 
-​		首先T[0]与P[0]不匹配，并且下一个T[1]与P[0]是匹配的，按照人类的想法，就是把P向右移动一位。
+首先T[0]与P[0]不匹配，并且下一个T[1]与P[0]是匹配的，按照人类的想法，就是把P向右移动一位。
 
 <img src="img/image-20210620092226176.png" alt="image-20210620092226176" style="zoom:50%;" />
 
@@ -75,6 +75,7 @@ T[1]== P[0]、T[2] == P[1]、T[3] == P[2] ，但是T[4] ≠ P[3]
 按照之前的朴素算法，P这个时候就要向右移动一位，并且i指针又开始回去了，做了重复的计算。
 
 <img src="img/image-20210620092452450.png" alt="image-20210620092452450" style="zoom:50%;" />
+
 
 i指针可以不用向前回退，那就要让j指针回退。上图中T[4] ≠ P[3]，但是P[3]之前的肯定是匹配的，就是aba，其前缀是a、ab；后缀是ba、a，前缀与后缀可以重合的就只有a，那么最大可重合元素数就是1,
 
@@ -87,7 +88,7 @@ i指针可以不用向前回退，那就要让j指针回退。上图中T[4] ≠ 
 假如abababa中只有最后的一个字符a没有匹配上，那么也就是说ababab是匹配的。
 
 ababab
-前缀：a、ab、aba、abab、ababa；后缀：babab、abab、baba、ab、b；最大重合数：4
+前缀：a、ab、aba、abab、ababa；后缀：babab、abab、bab、ab、b；最大重合数：4
 
 <img src="img/image-20210620101449356.png" alt="image-20210620101449356" style="zoom:50%;" />
 
@@ -115,7 +116,106 @@ ababab
 
 也就是说，如果j位置不匹配，就寻找j前面的子串的最大重合数，然后将j回溯到这个最大值处。此时就需要重建一个前缀表
 
+理解前缀与后缀后，来看看为什么求这个最大重合数,假如有这么个字符串，T和P，d与c不相等，也就是说前面的abab一定是相等的。
+
+![image-20220613222820198](img/image-20220613222820198.png)
+
+假如我们一点一点移动P
+
+![image-20220613223135526](img/image-20220613223135526.png)
+
+b与a不相等，继续移动P,T中的ab与P中的ab也可以重合，而且还是最大的重合，也就是说，没有到达最大重合数时，一次一次移动肯定都是不相等的。
+
+![image-20220613223339585](img/image-20220613223339585.png)
+
+
+
+那么为什么只需要移动到最大重合数那里就可以了，我们再来看一个,a与c处不相等，a处前面的子串一定需要让前后缀重合最大，a处后面的子串肯可能会与P移动后的字串匹配上。
+
+![image-20220613223700706](img/image-20220613223700706.png)
+
 ## 前缀表next
+
+在哪个地方不相等，就找到前面位置的前缀，比如P=“ababc”
+
+- 如果在P[0]处即a不相等，后面就不要匹配了，next[0]=0
+
+- 如果在P[1]处即b不相等，前面字串就是a，next[1]=0
+
+- 如果在P[2]处即a不相等，前面字串就是ab，next[2]=0
+
+- 如果在P[3]处即b不相等，前面字串就是aba，这么短，我们可以看出来，其实是有规律的，需要根据前面来推导处此处的值，前面是ab，没有公共前后缀，此时后面再追加一个a，而且还和P[0]相等，也就是说aba有一个a的公共前后缀，即next[3]=1
+
+- 如果在P[4]处即c不相等，前面字串就是abab，我们知道next[3]=1，即aba在b处是对称的，如果追加一个b，即abab就是在中间的b和a之间对称，而且对称可以达到2个，
+
+  这个规律就是如果`P[next[j - 1]] == P[j]`，那么`next[j] = next[j -1 ] +1`
+
+```java
+public int kmp(String t, String p) {
+        if (t == null || p == null) {
+            return -1;
+        }
+        if (t.length() == 0 || p.length() == 0) {
+            return -1;
+        }
+        if (t.length() < p.length()) {
+            return -1;
+        }
+        char[] ct = t.toCharArray();
+        char[] cp = p.toCharArray();
+
+        int[] next = getNext(p);
+        int i = 0;
+        int j = 0;
+        while (i < t.length() && j < p.length()) {
+            if (ct[i] != cp[j]) {
+                if (j == 0) {
+                    // 一开始就不匹配，i指针增加
+                    i++;
+                } else {
+                    // 从前缀表里找，重点，从匹配的前一个开始找
+                    j = next[j - 1];
+                }
+            } else {
+                if (j == p.length() - 1) {
+                    //完全匹配
+                    return i - j;
+                }
+                // 相等，继续向后匹配，增加i、j指针
+                j++;
+                i++;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 用来获取前缀表
+     */
+    public int[] getNext(String ps) {
+        char[] p = ps.toCharArray();
+        int[] next = new int[p.length];
+        next[0] = 0; // 给第一个位置的前缀为0
+        for (int j = 1; j < p.length; j++) {
+            if (p[next[j - 1]] == p[j]) {
+                next[j] = next[j - 1] + 1;
+            }
+        }
+        return next;
+    }
+```
+
+
+
+![image-20220613234751622](img/image-20220613234751622.png)
+
+
+
+
+
+下面是早期的思路（模仿）：
+
+
 
 接下来加计算前缀表
 
