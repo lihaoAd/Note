@@ -70,10 +70,11 @@ static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)
 	n->next = first;
 	if (first)
 		first->pprev = &n->next;
+    // n的地址保存到h->first变量中
 	h->first = n;
-	n->pprev = &h->first; // 指向前一个next
+    // pprev是一个二级指针变量，&h->first表示的是first指针变量所在的地址
+	n->pprev = &h->first; // 指向前一个
 }
-
 ````
 
 展开就是
@@ -82,13 +83,59 @@ static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)
 static struct hlist_head binder_procs = {  .first = NULL }
 ```
 
+`hlist_node`作为结构体嵌入到其他结构体中，例如后面的`binder_proc`,这样`&h->first`就表示这个`binder_proc`所在的地址
+
+```c
+struct binder_proc {
+    // 嵌入的列表,所有的binder_proc都在内核的binder_procs这个列表上，proc_node含有next和pre指针，
+	struct hlist_node proc_node;
+    
+    // 一个进程的所有Binder线程都保存在threads的红黑树中
+	struct rb_root threads;
+	
+    // 一个进程的所有Binder实体对象binder_node都保存在nodes红黑树中
+    struct rb_root nodes;
+    
+	struct rb_root refs_by_desc;
+	struct rb_root refs_by_node;
+    
+	int pid;
+	struct vm_area_struct *vma;   // 为调用进程的一段用户空间
+	struct task_struct *tsk;
+	struct files_struct *files;
+	struct hlist_node deferred_work_node;
+	int deferred_work;
+	void *buffer;                  // 为内核连续映射区首地址
+	ptrdiff_t user_buffer_offset;  // 为用户空间映射区首地址-内核空间连续映射的首地址,是一个负值
+
+	struct list_head buffers;
+    
+    // 空闲内核缓冲区，红黑树中的节点就是按照缓冲区中有效数据的大小
+	struct rb_root free_buffers;
+	struct rb_root allocated_buffers;
+    
+	size_t free_async_space;
+
+	struct page **pages; //为分配的物理页page的指针数组，开始只有一项，即1页，但是长度还是预留好了；
+	size_t buffer_size;  // 为需要映射的长度（小于4m）-sizeof（struct binder_buffer）
+	uint32_t buffer_free;
+	struct list_head todo;
+	wait_queue_head_t wait;
+	struct binder_stats stats;
+	struct list_head delivered_death;
+	int max_threads;
+	int requested_threads;
+	int requested_threads_started;
+	int ready_threads;
+	long default_priority;
+};
+```
+
+![image-20221128230251316](./img/image-20221128230251316.png)
 
 
-![image-20220418013916158](./img/image-20220418013916158.png)
 
-
-
-![image-20220418013941492](./img/image-20220418013941492.png)
+![image-20221128230430229](./img/image-20221128230430229.png)
 
 
 
@@ -159,7 +206,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 
 打开binder设备就会创建`binder_proc`结构体，表示打开binder设备的宿主进程。最后所有的`binder_proc`都保存在内核的`binder_procs`中。
 
-![image-20220418224937656](./img/image-20220418224937656.png)
+![image-20221128230516438](./img/image-20221128230516438.png)
 
 
 
