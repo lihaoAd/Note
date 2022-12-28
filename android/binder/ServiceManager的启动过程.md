@@ -393,6 +393,22 @@ static struct binder_node * binder_new_node(struct binder_proc *proc, void __use
 
 ## binder_loop
 
+drivers\staging\android\binder.h
+
+```c++
+enum BinderDriverCommandProtocol {
+
+....
+    
+BC_ENTER_LOOPER = _IO('c', 12),
+
+....
+
+}
+```
+
+
+
 frameworks/base/cmds/servicemanager/binder.c
 
 ```c
@@ -402,7 +418,6 @@ void binder_loop(struct binder_state *bs, binder_handler func)
     // BINDER_WRITE_READ 协议的数据 需要binder_write_read
     struct binder_write_read bwr;
     
-    // 用来包含协议 32字节
     unsigned readbuf[32];
 
     // 没有数据发送给binder驱动，后面会被改写
@@ -490,6 +505,7 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case BINDER_WRITE_READ: {
         
 		struct binder_write_read bwr;
+        
 		if (size != sizeof(struct binder_write_read)) {
 			ret = -EINVAL;
 			goto err;

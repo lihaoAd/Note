@@ -1,100 +1,3 @@
-## WifiService
-
-frameworks\base\services\java\com\android\server\WifiService.java
-
-```java
-public class WifiService extends IWifiManager.Stub {
-	....
-}
-```
-
-frameworks\base\wifi\java\android\net\wifi\IWifiManager.aidl
-
-```java
-public interface IWifiManager extends android.os.IInterface{
-
-	public static abstract class IWifiManager.Stub extends android.os.Binder implements android.net.wifi.IWifiManager{
-        
-        private static final java.lang.String DESCRIPTOR = "android.net.wifi.IWifiManager";
-    	
-    	public Stub(){
-            this.attachInterface(this,DESCRIPTOR);
-        }
-   	
-   		 public static android.net.wifi.IWifiManager asInterface(android.os.Binder obj){
-        	if(obj == null){
-            	return null;
-        	}
-        	android.os.IInterface iin = (android.os.IInterface)obj.queryLocalInterface(DESCRIPTOR);
-        	if( iin != null && iin instanceof android.net.wifi.IWifiManager){
-             	return (android.net.wifi.IWifiManager)iin;
-        	}
-       		return new android.net.wifi.IWifiManager.Stub.Proxy(obj);
-   		 }
-    
-   		 public android.od.IBinder asBinder(){
-         		return this;
-    	  }
-    
-    		.....
-        
-        
-    	 private static final class Proxy implements android.net.wifi.IWifiManager{
-             private android.od.IBinder mRemote;
-             
-             Proxy(android.os.IBinder remote){
-                 mRemote = remote;
-             }
-             
-              public android.od.IBinder asBinder(){
-         		return mRemotes;
-    	  	  }
-             
-             ....
-         }
-                
-    }
-    ....
-
-}
-```
-
-
-
-frameworks\base\core\java\android\os\Binder.java
-
-```java
-public class Binder implements IBinder {
-
-    // c++层 JavaBBinderHolder的指针地址
-    private int mObject;
-    
-    // 实现了IInterface的 IWifiManager.Stub对象
-    private IInterface mOwner;   
-    
-    // android.net.wifi.IWifiManager
-    private String mDescriptor;  
-    
-    public Binder() {
-        // 会在JNI层构造JavaBBinderHolder对象
-        init();
-        ...
-    }
-    
-	public void attachInterface(IInterface owner, String descriptor) {
-        mOwner = owner;
-        mDescriptor = descriptor;
-    }
-    
-    private native final void init();
-    
-    ....
-	
-}
-```
-
-
-
 ## WifiService 启动
 
 Wifiservice的启动地方在system server中
@@ -203,6 +106,101 @@ private ConnectivityService(Context context) {
                 break;
      ....
 
+}
+```
+
+## WifiService
+
+frameworks\base\services\java\com\android\server\WifiService.java
+
+```java
+public class WifiService extends IWifiManager.Stub {
+	....
+}
+```
+
+frameworks\base\wifi\java\android\net\wifi\IWifiManager.aidl
+
+```java
+public interface IWifiManager extends android.os.IInterface{
+
+	public static abstract class IWifiManager.Stub extends android.os.Binder implements android.net.wifi.IWifiManager{
+        
+        private static final java.lang.String DESCRIPTOR = "android.net.wifi.IWifiManager";
+    	
+    	public Stub(){
+            this.attachInterface(this,DESCRIPTOR);
+        }
+   	
+   		 public static android.net.wifi.IWifiManager asInterface(android.os.Binder obj){
+        	if(obj == null){
+            	return null;
+        	}
+        	android.os.IInterface iin = (android.os.IInterface)obj.queryLocalInterface(DESCRIPTOR);
+        	if( iin != null && iin instanceof android.net.wifi.IWifiManager){
+             	return (android.net.wifi.IWifiManager)iin;
+        	}
+       		return new android.net.wifi.IWifiManager.Stub.Proxy(obj);
+   		 }
+    
+   		 public android.od.IBinder asBinder(){
+         		return this;
+    	  }
+    
+    		.....
+        
+        
+    	 private static final class Proxy implements android.net.wifi.IWifiManager{
+             private android.od.IBinder mRemote;
+             
+             Proxy(android.os.IBinder remote){
+                 mRemote = remote;
+             }
+             
+              public android.od.IBinder asBinder(){
+         		return mRemotes;
+    	  	  }
+             
+             ....
+         }
+                
+    }
+    ....
+
+}
+```
+
+
+
+frameworks\base\core\java\android\os\Binder.java
+
+```java
+public class Binder implements IBinder {
+
+    // c++层 JavaBBinderHolder的指针地址
+    private int mObject;
+    
+    // 实现了IInterface的 IWifiManager.Stub对象，即WifiService对象
+    private IInterface mOwner;   
+    
+    // android.net.wifi.IWifiManager
+    private String mDescriptor;  
+    
+    public Binder() {
+        // 会在JNI层构造JavaBBinderHolder对象
+        init();
+        ...
+    }
+    
+	public void attachInterface(IInterface owner, String descriptor) {
+        mOwner = owner;
+        mDescriptor = descriptor;
+    }
+    
+    private native final void init();
+    
+    ....
+	
 }
 ```
 
@@ -400,7 +398,7 @@ private static IServiceManager getIServiceManager() {
         }
 
         // Find the service manager
-        // ServiceManagerProxy
+        // Java层的 ServiceManagerProxy
         sServiceManager = ServiceManagerNative.asInterface(BinderInternal.getContextObject());
         return sServiceManager;
     }
@@ -413,8 +411,6 @@ private static IServiceManager getIServiceManager() {
 
 
 ### ServiceManagerProxy
-
-
 
 frameworks\base\core\java\android\os\ServiceManagerNative.java
 
@@ -450,7 +446,16 @@ Client进程和Server进程的一次进程间通信过程可以划分为如下5�
 
 ![](img/进程间通信时序图.jpg)
 
+frameworks\base\libs\binder\Parcel.cpp
 
+```c++
+status_t Parcel::writeInterfaceToken(const String16& interface)
+{
+    writeInt32(IPCThreadState::self()->getStrictModePolicy() | STRICT_MODE_PENALTY_GATHER);
+    // currently the interface identification token is just its name as a string
+    return writeString16(interface);
+}
+```
 
 
 

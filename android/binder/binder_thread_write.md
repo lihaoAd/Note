@@ -1,7 +1,5 @@
 ## binder_thread_write
 
-
-
 ```c
 int binder_thread_write(struct binder_proc *proc, struct binder_thread *thread, void __user *buffer, int size, signed long *consumed)
 {
@@ -243,6 +241,28 @@ case BC_REPLY: {
 ```
 
 ![image-20220321233808041](./img/image-20220321233808041.png)
+
+
+
+
+
+## BC_ENTER_LOOPER
+
+```java
+		case BC_ENTER_LOOPER:
+			if (binder_debug_mask & BINDER_DEBUG_THREADS)
+				printk(KERN_INFO "binder: %d:%d BC_ENTER_LOOPER\n",
+				       proc->pid, thread->pid);
+			if (thread->looper & BINDER_LOOPER_STATE_REGISTERED) {
+				thread->looper |= BINDER_LOOPER_STATE_INVALID;
+				binder_user_error("binder: %d:%d ERROR:"
+					" BC_ENTER_LOOPER called after "
+					"BC_REGISTER_LOOPER\n",
+					proc->pid, thread->pid);
+			}
+			thread->looper |= BINDER_LOOPER_STATE_ENTERED;
+			break;
+```
 
 
 

@@ -51,7 +51,7 @@ drivers/staging/android/binder.c
 static HLIST_HEAD(binder_procs);
 ```
 
-include\linux\list.h
+include/linux/list.h
 
 ````c
 struct hlist_head {
@@ -141,12 +141,9 @@ struct binder_proc {
 
 调用`open(/dev/binder)`会在内核中创建`binder_proc`结构体，来描述该进程，并且在`/proc/binder/proc/`目录下创建了一个以该进程`PID`的文件名，读取它，就可以知道进程pid的binder线程池、binder_node、binder_ref、以及内核缓冲区等信息
 
-drivers\staging\android\binder.c
+drivers/staging/android/binder.c
 
 ```c
-
-....
-    
 static int binder_open(struct inode *nodp, struct file *filp)
 {
 	struct binder_proc *proc;
@@ -226,7 +223,7 @@ drivers/staging/android/binder.c
 static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	int ret;
-	// 描述内核虚拟地址空间
+	// vm_struct 描述内核虚拟地址空间
 	struct vm_struct *area;
 	struct binder_proc *proc = filp->private_data;
 	const char *failure_string;

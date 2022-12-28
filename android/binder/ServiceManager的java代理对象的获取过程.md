@@ -17,6 +17,7 @@ public final class ServiceManager {
         }
 
         // Find the service manager
+        // 最后得到的是java层的ServiceManagerProxy
         sServiceManager = ServiceManagerNative.asInterface(BinderInternal.getContextObject());
         return sServiceManager;
     }
@@ -25,6 +26,8 @@ public final class ServiceManager {
  
  }
 ```
+
+`BinderInternal.getContextObject()`返回的是一个java层的`BinderProxy`对象
 
 
 
@@ -56,7 +59,7 @@ static jobject android_os_BinderInternal_getContextObject(JNIEnv* env, jobject c
  	// 这个就是BpBinder
     sp<IBinder> b = ProcessState::self()->getContextObject(NULL);
     
-    // 如果是Binder代理对象（BpBinder），就会返回BpBinderProxy对象
+    // 如果是Binder代理对象（BpBinder），就会返回BinderProxy对象
     return javaObjectForIBinder(env, b);
 }
 ```

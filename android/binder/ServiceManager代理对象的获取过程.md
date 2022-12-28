@@ -158,6 +158,8 @@ static int open_driver()
 
 ## getContextObject
 
+frameworks\base\libs\binder\ProcessState.cpp
+
 ```c
 sp<IBinder> ProcessState::getContextObject(const sp<IBinder>& caller)
 {
@@ -188,33 +190,32 @@ struct handle_entry {
   };
 ```
 
-
+frameworks\base\libs\binder\ProcessState.cpp
 
 ```c++
-wp<IBinder> ProcessState::getWeakProxyForHandle(int32_t handle)
+sp<IBinder> ProcessState::getStrongProxyForHandle(int32_t handle)
 {
-    wp<IBinder> result;
+    sp<IBinder> result;
 
     AutoMutex _l(mLock);
 
     handle_entry* e = lookupHandleLocked(handle);
 
-    if (e != NULL) {        
+    if (e != NULL) {
         // We need to create a new BpBinder if there isn't currently one, OR we
-        // are unable to acquire a weak reference on this current one.  The
-        // attemptIncWeak() is safe because we know the BpBinder destructor will always
-        // call expungeHandle(), which acquires the same lock we are holding now.
-        // We need to do this because there is a race condition between someone
-        // releasing a reference on this BpBinder, and a new reference on its handle
-        // arriving from the driver.
+        // are unable to acquire a weak reference on this current one.  See comment
+        // in getWeakProxyForHandle() for more info about this.
         IBinder* b = e->binder;
         if (b == NULL || !e->refs->attemptIncWeak(this)) {
-            b = new BpBinder(handle);
-            result = b;
+            b = new BpBinder(handle); 
             e->binder = b;
-                if (b) e->refs = b->getWeakRefs();
-        } else {
+            if (b) e->refs = b->getWeakRefs();
             result = b;
+        } else {
+            // This little bit of nastyness is to allow us to add a primary
+            // reference to the remote proxy when this team doesn't have one
+            // but another team is sending the handle to us.
+            result.force_set(b);
             e->refs->decWeak(this);
         }
     }
@@ -241,24 +242,81 @@ ProcessState::handle_entry* ProcessState::lookupHandleLocked(int32_t handle)
 frameworks\base\include\binder\ProcessState.h
 
 ```c++
-Vector<handle_entry>mHandleToObject;
-```
-
-
-
-```c
-ProcessState::handle_entry* ProcessState::lookupHandleLocked(int32_t handle)
+class ProcessState : public virtual RefBase
 {
-    const size_t N=mHandleToObject.size();
-    if (N <= (size_t)handle) {
-        handle_entry e;
-        e.binder = NULL;
-        e.refs = NULL;
-        status_t err = mHandleToObject.insertAt(e, N, handle+1-N);
-        if (err < NO_ERROR) return NULL;
-    }
-    return &mHandleToObject.editItemAt(handle);
-}
+public:
+    static  sp<ProcessState>    self();
+
+    static  void                setSingleProcess(bool singleProcess);
+
+            void                setContextObject(const sp<IBinder>& object);
+            sp<IBinder>         getContextObject(const sp<IBinder>& caller);
+        
+            void                setContextObject(const sp<IBinder>& object,
+                                                 const String16& name);
+            sp<IBinder>         getContextObject(const String16& name,
+                                                 const sp<IBinder>& caller);
+                                                 
+            bool                supportsProcesses() const;
+
+            void                startThreadPool();
+                        
+    typedef bool (*context_check_func)(const String16& name,
+                                       const sp<IBinder>& caller,
+                                       void* userData);
+        
+            bool                isContextManager(void) const;
+            bool                becomeContextManager(
+                                    context_check_func checkFunc,
+                                    void* userData);
+
+            sp<IBinder>         getStrongProxyForHandle(int32_t handle);
+            wp<IBinder>         getWeakProxyForHandle(int32_t handle);
+            void                expungeHandle(int32_t handle, IBinder* binder);
+
+            void                setArgs(int argc, const char* const argv[]);
+            int                 getArgC() const;
+            const char* const*  getArgV() const;
+
+            void                setArgV0(const char* txt);
+
+            void                spawnPooledThread(bool isMain);
+            
+private:
+    friend class IPCThreadState;
+    
+                                ProcessState();
+                                ~ProcessState();
+
+                                ProcessState(const ProcessState& o);
+            ProcessState&       operator=(const ProcessState& o);
+            
+            struct handle_entry {
+                IBinder* binder;
+                RefBase::weakref_type* refs;
+            };
+            
+            handle_entry*       lookupHandleLocked(int32_t handle);
+
+            int                 mDriverFD;
+            void*               mVMStart;
+            
+    mutable Mutex               mLock;  // protects everything below.
+            
+            Vector<handle_entry>mHandleToObject;
+
+            bool                mManagesContexts;
+            context_check_func  mBinderContextCheckFunc;
+            void*               mBinderContextUserData;
+            
+            KeyedVector<String16, sp<IBinder> >
+                                mContexts;
+
+
+            String8             mRootDir;
+            bool                mThreadPoolStarted;
+    volatile int32_t            mThreadPoolSeq;
+};
 ```
 
 进程的binder代理对象都保存在`ProcessState`类的成员变量`mHandleToObject`中
@@ -267,7 +325,7 @@ ProcessState::handle_entry* ProcessState::lookupHandleLocked(int32_t handle)
 
 ## interface_cast
 
-
+frameworks\base\include\binder\IInterface.h
 
 ```c
 template<typename INTERFACE>
@@ -371,8 +429,96 @@ frameworks\base\include\binder\BpBinder.h
 ```c++
 class BpBinder : public IBinder
 {
-....
-}
+public:
+                        BpBinder(int32_t handle);
+
+    inline  int32_t     handle() const { return mHandle; }
+
+    virtual const String16&    getInterfaceDescriptor() const;
+    virtual bool        isBinderAlive() const;
+    virtual status_t    pingBinder();
+    virtual status_t    dump(int fd, const Vector<String16>& args);
+
+    virtual status_t    transact(   uint32_t code,
+                                    const Parcel& data,
+                                    Parcel* reply,
+                                    uint32_t flags = 0);
+
+    virtual status_t    linkToDeath(const sp<DeathRecipient>& recipient,
+                                    void* cookie = NULL,
+                                    uint32_t flags = 0);
+    virtual status_t    unlinkToDeath(  const wp<DeathRecipient>& recipient,
+                                        void* cookie = NULL,
+                                        uint32_t flags = 0,
+                                        wp<DeathRecipient>* outRecipient = NULL);
+
+    virtual void        attachObject(   const void* objectID,
+                                        void* object,
+                                        void* cleanupCookie,
+                                        object_cleanup_func func);
+    virtual void*       findObject(const void* objectID) const;
+    virtual void        detachObject(const void* objectID);
+
+    virtual BpBinder*   remoteBinder();
+
+            status_t    setConstantData(const void* data, size_t size);
+            void        sendObituary();
+
+    class ObjectManager
+    {
+    public:
+                    ObjectManager();
+                    ~ObjectManager();
+
+        void        attach( const void* objectID,
+                            void* object,
+                            void* cleanupCookie,
+                            IBinder::object_cleanup_func func);
+        void*       find(const void* objectID) const;
+        void        detach(const void* objectID);
+
+        void        kill();
+
+    private:
+                    ObjectManager(const ObjectManager&);
+        ObjectManager& operator=(const ObjectManager&);
+
+        struct entry_t
+        {
+            void* object;
+            void* cleanupCookie;
+            IBinder::object_cleanup_func func;
+        };
+
+        KeyedVector<const void*, entry_t> mObjects;
+    };
+
+protected:
+    virtual             ~BpBinder();
+    virtual void        onFirstRef();
+    virtual void        onLastStrongRef(const void* id);
+    virtual bool        onIncStrongAttempted(uint32_t flags, const void* id);
+
+private:
+    const   int32_t             mHandle; // 重要
+
+    struct Obituary {
+        wp<DeathRecipient> recipient;
+        void* cookie;
+        uint32_t flags;
+    };
+
+            void                reportOneDeath(const Obituary& obit);
+            bool                isDescriptorCached() const;
+
+    mutable Mutex               mLock;
+            volatile int32_t    mAlive;
+            volatile int32_t    mObitsSent;
+            Vector<Obituary>*   mObituaries;
+            ObjectManager       mObjects;
+            Parcel*             mConstantData;
+    mutable String16            mDescriptorCache;
+};
 ```
 
 

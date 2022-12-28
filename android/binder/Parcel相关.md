@@ -1,5 +1,35 @@
 ## java层Parcel与C++层Parcel之间的关系
 
+frameworks\base\core\java\android\os\Parcel.java
+
+```java
+public final class Parcel {
+    ...
+
+    @SuppressWarnings({"UnusedDeclaration"})
+	// 该变量保存的是和Java层相对应的C++层的Parcel的地址值
+    private int mObject; // used by native code
+    @SuppressWarnings({"UnusedDeclaration"})
+	
+	// mOwnObject为1表示mObject是native创建的
+    private int mOwnObject; // used by native code
+    
+    
+    private RuntimeException mStack;
+
+    private static final int POOL_SIZE = 6;
+    private static final Parcel[] sOwnedPool = new Parcel[POOL_SIZE];
+    private static final Parcel[] sHolderPool = new Parcel[POOL_SIZE];
+    
+    
+    .....
+    
+    
+  }  
+```
+
+
+
 Parcel 在内存中的结构是一块连续的内存，会动根据需要自动扩展大小
 
 frameworks\base\core\jni\android_util_Binder.cpp
@@ -85,6 +115,26 @@ public static Parcel obtain() {
         }
         return new Parcel(0);
     }
+
+    /**
+     * Put a Parcel object back into the pool.  You must not touch
+     * the object after this call.
+     */
+public final void recycle() {
+        if (DEBUG_RECYCLE) mStack = null;
+        freeBuffer();
+        final Parcel[] pool = mOwnObject != 0 ? sOwnedPool : sHolderPool;
+        synchronized (pool) {
+            for (int i=0; i<POOL_SIZE; i++) {
+                if (pool[i] == null) {
+                    pool[i] = this;
+                    return;
+                }
+            }
+        }
+    }
+
+private native void freeBuffer();
 ```
 
 
@@ -175,7 +225,6 @@ Parcel::Parcel()
 {
     initState();
 }
-
 
 
 ....
@@ -420,6 +469,14 @@ restart_write:
     if (err == NO_ERROR) goto restart_write;
     return err;
 }
+
+status_t Parcel::growData(size_t len)
+{
+    size_t newSize = ((mDataSize+len)*3)/2;
+    return (newSize <= mDataSize)
+            ? (status_t) NO_MEMORY
+            : continueWrite(newSize);
+}
 ```
 
 宏定义`COMPILE_TIME_ASSERT_FUNCTION_SCOPE`主要是确定要字节对齐,是4或者4的整数倍
@@ -446,7 +503,7 @@ frameworks\base\libs\binder\Parcel.cpp
 
 当s=4时：0x0000 0100 + 0x0000 0011 = 0x0000 0111,  0x0000 0111 & 0x1111 1100 = 0x0000 0100 = 4
 
-当s=5时：0x0000 0101 + 0x0000 1000 = 0x0000 1000,  0x0000 1000 & 0x1111 1100 = 0x0000 1000 = 8
+当s=5时：0x0000 0101 + 0x0000 0011 = 0x0000 1000,  0x0000 1000 & 0x1111 1100 = 0x0000 1000 = 8
 
 ### writeString
 
